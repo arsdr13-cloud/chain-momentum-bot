@@ -2,9 +2,7 @@ import os
 import tweepy
 import schedule
 import time
-import threading
 from datetime import datetime
-from flask import Flask
 
 # ===== TWITTER SETUP =====
 api_key = os.getenv("API_KEY")
@@ -26,22 +24,8 @@ schedule.every().day.at("12:00").do(tweet_crypto)
 schedule.every().day.at("18:00").do(tweet_crypto)
 schedule.every().day.at("22:00").do(tweet_crypto)
 
-def run_bot():
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
+print("Bot started...")
 
-# ===== FLASK SERVER (MAIN PROCESS) =====
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Bot is running!"
-
-if __name__ == "__main__":
-    # Jalankan bot di background
-    threading.Thread(target=run_bot).start()
-
-    # Flask jadi proses utama
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+while True:
+    schedule.run_pending()
+    time.sleep(30)
