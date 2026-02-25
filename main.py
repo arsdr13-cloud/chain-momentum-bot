@@ -171,7 +171,7 @@ def daily_thread():
 # ==============================
 
 schedule.every().day.at("06:00").do(post_update)
-schedule.every(1).minutes.do(daily_thread)   
+schedule.every().day.at("09:00").do(daily_thread)   # ← TAMBAH INI
 schedule.every().day.at("12:00").do(post_update)
 schedule.every().day.at("18:00").do(post_update)
 schedule.every().day.at("22:00").do(post_update)
