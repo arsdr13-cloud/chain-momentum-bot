@@ -44,16 +44,15 @@ def generate_chart():
     for coin_id, symbol in coins.items():
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
         params = {"vs_currency": "usd", "days": "1"}
-        
+
         response = requests.get(url, params=params, timeout=10)
-data = response.json()
-        
-if "prices" not in data:
+        data = response.json()
+
+        if "prices" not in data:
             continue
 
         prices = [p[1] for p in data["prices"]]
 
-        # NORMALIZE supaya semua terlihat jelas
         base = prices[0]
         normalized = [(p/base)*100 for p in prices]
 
