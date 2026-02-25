@@ -10,19 +10,29 @@ api_secret = os.getenv("API_SECRET")
 access_token = os.getenv("ACCESS_TOKEN")
 access_secret = os.getenv("ACCESS_SECRET")
 
+print("Checking environment variables...")
+
+if not all([api_key, api_secret, access_token, access_secret]):
+    print("ERROR: One or more environment variables are missing!")
+    exit()
+
 auth = tweepy.OAuth1UserHandler(api_key, api_secret, access_token, access_secret)
 api = tweepy.API(auth)
 
 def tweet_crypto():
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    message = f"🚀 Chain_Momentum Update\n\nBTC | ETH | SOL\nTime: {now}\n\n#Crypto #BTC #ETH #SOL"
-    api.update_status(message)
-    print("Tweet sent!")
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        message = f"🚀 Chain_Momentum Update\n\nBTC | ETH | SOL\nTime: {now}\n\n#Crypto #BTC #ETH #SOL"
+        api.update_status(message)
+        print("Tweet sent!")
+    except Exception as e:
+        print("Tweet error:", e)
 
 schedule.every().day.at("06:00").do(tweet_crypto)
 schedule.every().day.at("12:00").do(tweet_crypto)
 schedule.every().day.at("18:00").do(tweet_crypto)
 schedule.every().day.at("22:00").do(tweet_crypto)
+
 print("Bot started...")
 
 while True:
