@@ -182,11 +182,13 @@ SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%
 # ==============================
 
 def auto_reply():
-def auto_reply():
     global replied_ids
 
     me = client.get_me()
-    mentions = client.get_users_mentions(id=me.data.id, max_results=5)
+    mentions = client.get_users_mentions(
+        id=me.data.id,
+        max_results=5
+    )
 
     if mentions and mentions.data:
         for tweet in mentions.data:
