@@ -147,16 +147,40 @@ def auto_reply():
             )
 
 # ==============================
+# SMART ENGAGEMENT
+# ==============================
+
+def smart_engagement():
+    tweets = client.search_recent_tweets(
+        query="BTC OR Ethereum OR Solana -is:retweet",
+        max_results=5
+    )
+
+    if tweets.data:
+        for tweet in tweets.data:
+            try:
+                client.like(tweet.id)
+            except:
+                pass
+                
+# ==============================
 # DAILY THREAD
 # ==============================
 
 def daily_thread():
+    data = get_market_data()
+
+    btc = data["bitcoin"]["usd"]
+    btc_change = data["bitcoin"]["usd_24h_change"]
+
+    direction = "bullish 🚀" if btc_change > 0 else "bearish ⚠️"
+
     tweets = [
-        "📊 Daily Crypto Insight",
-        "1️⃣ BTC dominance impact",
-        "2️⃣ ETH ecosystem growth",
-        "3️⃣ SOL network performance",
-        "Follow for daily updates 🚀"
+        f"📊 Daily Crypto Insight\n\nBTC currently ${btc:.0f} ({btc_change:.2f}%)",
+        f"1️⃣ Market sentiment looks {direction}",
+        "2️⃣ Watch key resistance & support levels",
+        "3️⃣ Manage risk properly in volatile sessions",
+        "Follow for consistent crypto analysis 🔥"
     ]
 
     first = client.create_tweet(text=tweets[0])
@@ -177,6 +201,7 @@ schedule.every().day.at("18:00").do(post_update)
 schedule.every().day.at("22:00").do(post_update)
 
 schedule.every(60).minutes.do(auto_reply)
+schedule.every(30).minutes.do(smart_engagement)
 
 print("Bot started...")
 
