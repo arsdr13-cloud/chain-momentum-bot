@@ -3,8 +3,8 @@ import tweepy
 import schedule
 import time
 from datetime import datetime
-from flask import Flask
 import threading
+from flask import Flask
 
 # ===== TWITTER SETUP =====
 api_key = os.getenv("API_KEY")
@@ -21,27 +21,27 @@ def tweet_crypto():
     api.update_status(message)
     print("Tweet sent!")
 
-# ===== SCHEDULE =====
 schedule.every().day.at("06:00").do(tweet_crypto)
 schedule.every().day.at("12:00").do(tweet_crypto)
 schedule.every().day.at("18:00").do(tweet_crypto)
 schedule.every().day.at("22:00").do(tweet_crypto)
 
-def run_schedule():
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
-
-threading.Thread(target=run_schedule, daemon=True).start()
-
-# ===== FLASK (MAIN PROCESS) =====
+# ===== WEB SERVER (WAJIB UNTUK RAILWAY) =====
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "Bot is running!"
 
-if __name__ == "__main__":
+def run_bot():
     print("Bot started...")
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
+
+def run_web():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
+threading.Thread(target=run_bot).start()
+run_web()
