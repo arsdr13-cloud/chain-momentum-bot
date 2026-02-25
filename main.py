@@ -147,13 +147,35 @@ def auto_reply():
             )
 
 # ==============================
+# DAILY THREAD
+# ==============================
+
+def daily_thread():
+    tweets = [
+        "📊 Daily Crypto Insight",
+        "1️⃣ BTC dominance impact",
+        "2️⃣ ETH ecosystem growth",
+        "3️⃣ SOL network performance",
+        "Follow for daily updates 🚀"
+    ]
+
+    first = client.create_tweet(text=tweets[0])
+    reply_id = first.data["id"]
+
+    for t in tweets[1:]:
+        r = client.create_tweet(text=t, in_reply_to_tweet_id=reply_id)
+        reply_id = r.data["id"]
+
+# ==============================
 # SCHEDULE
 # ==============================
 
 schedule.every().day.at("06:00").do(post_update)
+schedule.every().day.at("09:00").do(daily_thread)   # ← TAMBAH INI
 schedule.every().day.at("12:00").do(post_update)
 schedule.every().day.at("18:00").do(post_update)
 schedule.every().day.at("22:00").do(post_update)
+
 schedule.every(60).minutes.do(auto_reply)
 
 print("Bot started...")
