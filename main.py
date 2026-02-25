@@ -156,18 +156,14 @@ def post_update():
         caption = generate_caption(data)
         chart = generate_chart()
 
-        text = f"""
-📊 Market Snapshot
-
-BTC ${btc:,.0f} {arrow(btc_change)} {btc_change:.2f}%
-ETH ${eth:,.0f} {arrow(eth_change)} {eth_change:.2f}%
-SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%
-
-24H Insight:
-{caption}
-
-#Crypto #Bitcoin #Ethereum #Solana
-"""
+        text = (
+    f"📊 Market Snapshot\n\n"
+    f"BTC ${btc:,.0f} {arrow(btc_change)} {btc_change:.2f}%\n"
+    f"ETH ${eth:,.0f} {arrow(eth_change)} {eth_change:.2f}%\n"
+    f"SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%\n\n"
+    f"24H Insight:\n{caption}\n\n"
+    f"#Crypto #Bitcoin #Ethereum #Solana"
+)
 
         media = api_v1.media_upload(chart)
         client.create_tweet(text=text, media_ids=[media.media_id])
