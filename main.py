@@ -21,10 +21,7 @@ def tweet_crypto():
     api.update_status(message)
     print("Tweet sent!")
 
-schedule.every().day.at("06:00").do(tweet_crypto)
-schedule.every().day.at("12:00").do(tweet_crypto)
-schedule.every().day.at("18:00").do(tweet_crypto)
-schedule.every().day.at("22:00").do(tweet_crypto)
+schedule.every().minute.do(tweet_crypto)
 
 # ===== WEB SERVER (WAJIB UNTUK RAILWAY) =====
 app = Flask(__name__)
