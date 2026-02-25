@@ -118,7 +118,6 @@ def post_update():
 
     data = get_market_data()
 
-    # SAFETY CHECK
     if not data:
         print("Market data failed. Skipping post.")
         return
@@ -128,17 +127,17 @@ def post_update():
         eth = data["ethereum"]["usd"]
         sol = data["solana"]["usd"]
 
+        btc_change = data["bitcoin"]["usd_24h_change"]
+        eth_change = data["ethereum"]["usd_24h_change"]
+        sol_change = data["solana"]["usd_24h_change"]
+
+        def arrow(change):
+            return "🟢" if change >= 0 else "🔴"
+
         caption = generate_caption(data)
         chart = generate_chart()
 
-        btc_change = data["bitcoin"]["usd_24h_change"]
-eth_change = data["ethereum"]["usd_24h_change"]
-sol_change = data["solana"]["usd_24h_change"]
-
-def arrow(change):
-    return "🟢" if change >= 0 else "🔴"
-
-text = f"""
+        text = f"""
 📊 Market Snapshot
 
 BTC ${btc:,.0f} {arrow(btc_change)} {btc_change:.2f}%
@@ -149,7 +148,6 @@ SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%
 {caption}
 
 #Crypto #Bitcoin #Ethereum #Solana
-"""
 """
 
         media = api_v1.media_upload(chart)
