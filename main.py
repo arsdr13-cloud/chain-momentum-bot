@@ -7,10 +7,22 @@ import os
 import random
 
 # ==============================
-# GLOBAL MEMORY (ANTI DUPLICATE)
+# PERMANENT STORAGE (ANTI DUPLICATE)
 # ==============================
 
-replied_ids = set()
+REPLIED_FILE = "replied_ids.txt"
+
+def load_replied_ids():
+    if not os.path.exists(REPLIED_FILE):
+        return set()
+    with open(REPLIED_FILE, "r") as f:
+        return set(line.strip() for line in f)
+
+def save_replied_id(tweet_id):
+    with open(REPLIED_FILE, "a") as f:
+        f.write(f"{tweet_id}\n")
+
+replied_ids = load_replied_ids()
 
 # ==============================
 # MARKET DATA
@@ -169,7 +181,7 @@ SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%
 # AUTO REPLY
 # ==============================
 
-def def auto_reply():
+def auto_reply():
     global replied_ids
 
     me = client.get_me()
@@ -187,7 +199,8 @@ def def auto_reply():
                     in_reply_to_tweet_id=tweet.id
                 )
 
-                replied_ids.add(tweet.id)
+                replied_ids.add(str(tweet.id))
+save_replied_id(tweet.id)
                 print(f"Replied to {tweet.id}")
 
             except Exception as e:
