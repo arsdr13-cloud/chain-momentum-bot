@@ -197,9 +197,13 @@ def smart_engagement():
 def daily_thread():
     data = get_market_data()
 
+    # SAFETY CHECK
+    if not data:
+        print("Market data failed. Skipping thread.")
+        return
+
     btc = data["bitcoin"]["usd"]
     btc_change = data["bitcoin"]["usd_24h_change"]
-
     direction = "bullish 🚀" if btc_change > 0 else "bearish ⚠️"
 
     tweets = [
