@@ -182,6 +182,7 @@ SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%
 # ==============================
 
 def auto_reply():
+def auto_reply():
     global replied_ids
 
     me = client.get_me()
@@ -190,7 +191,7 @@ def auto_reply():
     if mentions and mentions.data:
         for tweet in mentions.data:
 
-            if tweet.id in replied_ids:
+            if str(tweet.id) in replied_ids:
                 continue
 
             try:
@@ -200,12 +201,12 @@ def auto_reply():
                 )
 
                 replied_ids.add(str(tweet.id))
-save_replied_id(tweet.id)
+                save_replied_id(tweet.id)
+
                 print(f"Replied to {tweet.id}")
 
             except Exception as e:
                 print("Reply error:", e)
-
 # ==============================
 # SMART ENGAGEMENT
 # ==============================
