@@ -141,7 +141,10 @@ def auto_reply():
 # SCHEDULE
 # ==============================
 
-schedule.every(1).minutes.do(post_update)
+schedule.every().day.at("06:00").do(post_update)
+schedule.every().day.at("12:00").do(post_update)
+schedule.every().day.at("18:00").do(post_update)
+schedule.every().day.at("22:00").do(post_update)
 schedule.every(60).minutes.do(auto_reply)
 
 print("Bot started...")
