@@ -6,6 +6,15 @@ import time
 import os
 import random
 
+def engagement_prompt():
+    prompts = [
+        "Bullish or bearish this week?",
+        "Are you positioned or waiting?",
+        "What’s your bias right now?",
+        "Agree with this structure?"
+    ]
+    return random.choice(prompts)
+    
 # ==============================
 # PERMANENT STORAGE (ANTI DUPLICATE)
 # ==============================
@@ -92,7 +101,30 @@ def generate_chart():
 # ==============================
 
 def generate_caption(data):
+  def generate_structured_insight(data):
+    btc = data["bitcoin"]["usd"]
     btc_change = data["bitcoin"]["usd_24h_change"]
+
+    if btc_change > 2:
+        bias = "Bullish"
+        scenario = "Momentum continuation likely if breakout holds."
+    elif btc_change < -2:
+        bias = "Bearish"
+        scenario = "Possible downside continuation if support fails."
+    else:
+        bias = "Neutral"
+        scenario = "Consolidation range before expansion."
+
+    key_level = round(btc * 0.98, 0)
+    invalidation = round(btc * 0.95, 0)
+
+    return {
+        "bias": bias,
+        "key_level": key_level,
+        "invalidation": invalidation,
+        "scenario": scenario
+    }
+      btc_change = data["bitcoin"]["usd_24h_change"]
 
     if btc_change > 3:
         tone = "Strong bullish momentum 🚀"
@@ -156,13 +188,19 @@ def post_update():
         caption = generate_caption(data)
         chart = generate_chart()
 
-        text = (
-    f"📊 Market Snapshot\n\n"
-    f"BTC ${btc:,.0f} {arrow(btc_change)} {btc_change:.2f}%\n"
-    f"ETH ${eth:,.0f} {arrow(eth_change)} {eth_change:.2f}%\n"
-    f"SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%\n\n"
-    f"24H Insight:\n{caption}\n\n"
-    f"#Crypto #Bitcoin #Ethereum #Solana"
+    insight = generate_structured_insight(data)
+
+text = (
+    f"MARKET STRUCTURE UPDATE\n\n"
+    f"BTC Price: ${btc:,.0f}\n"
+    f"Bias: {insight['bias']}\n"
+    f"Key Level: ${insight['key_level']:,.0f}\n"
+    f"Invalidation: ${insight['invalidation']:,.0f}\n\n"
+    f"Scenario:\n{insight['scenario']}\n\n"
+    f"Manage risk properly."
+
+    if random.random() < 0.3:
+    text += "\n\n" + engagement_prompt()
 )
 
         media = api_v1.media_upload(chart)
@@ -227,6 +265,29 @@ def smart_engagement():
 # ==============================
 
 def daily_thread():
+    def weekly_recap_thread():
+    data = get_market_data()
+    if not data:
+        return
+
+    btc = data["bitcoin"]["usd"]
+    btc_change = data["bitcoin"]["usd_24h_change"]
+
+    tweets = [
+        "WEEKLY CRYPTO RECAP 🧵",
+        f"BTC closed at ${btc:,.0f} this week.",
+        f"Weekly change: {btc_change:.2f}%",
+        "Market structure remains intact unless key levels break.",
+        "Position smart. Protect capital."
+    ]
+
+    first = client.create_tweet(text=tweets[0])
+    reply_id = first.data["id"]
+
+    for t in tweets[1:]:
+        r = client.create_tweet(text=t, in_reply_to_tweet_id=reply_id)
+        reply_id = r.data["id"]
+        
     data = get_market_data()
 
     # SAFETY CHECK
@@ -257,6 +318,7 @@ def daily_thread():
 # SCHEDULE
 # ==============================
 
+schedule.every().sunday.at("20:00").do(weekly_recap_thread)
 schedule.every().day.at("06:00").do(post_update)
 schedule.every().day.at("09:00").do(daily_thread)   # ← TAMBAH INI
 schedule.every().day.at("12:00").do(post_update)
