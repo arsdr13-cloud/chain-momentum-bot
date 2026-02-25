@@ -5,18 +5,11 @@ import schedule
 import time
 import os
 import random
+from flask import Flask
+import threading
 
-def engagement_prompt():
-    prompts = [
-        "Bullish or bearish this week?",
-        "Are you positioned or waiting?",
-        "What’s your bias right now?",
-        "Agree with this structure?"
-    ]
-    return random.choice(prompts)
-    
 # ==============================
-# PERMANENT STORAGE (ANTI DUPLICATE)
+# STORAGE (ANTI DUPLICATE REPLY)
 # ==============================
 
 REPLIED_FILE = "replied_ids.txt"
@@ -34,6 +27,19 @@ def save_replied_id(tweet_id):
 replied_ids = load_replied_ids()
 
 # ==============================
+# ENGAGEMENT PROMPT
+# ==============================
+
+def engagement_prompt():
+    prompts = [
+        "Bullish or bearish this week?",
+        "Are you positioned or waiting?",
+        "What’s your bias right now?",
+        "Agree with this structure?"
+    ]
+    return random.choice(prompts)
+
+# ==============================
 # MARKET DATA
 # ==============================
 
@@ -46,62 +52,17 @@ def get_market_data():
             "include_24hr_change": "true"
         }
         response = requests.get(url, params=params, timeout=10)
-
         if response.status_code != 200:
             return None
-
         return response.json()
-
     except:
         return None
-        
-# ==============================
-# CHART GENERATOR
-# ==============================
-
-def generate_chart():
-    coins = {
-        "bitcoin": "BTC",
-        "ethereum": "ETH",
-        "solana": "SOL"
-    }
-
-    plt.figure()
-
-    for coin_id, symbol in coins.items():
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-        params = {"vs_currency": "usd", "days": "1"}
-
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-
-        if "prices" not in data:
-            continue
-
-        prices = [p[1] for p in data["prices"]]
-
-        base = prices[0]
-        normalized = [(p/base)*100 for p in prices]
-
-        plt.plot(normalized, label=symbol)
-
-    plt.legend()
-    plt.title("24H Performance (%)")
-    plt.xlabel("Time")
-    plt.ylabel("Performance %")
-
-    filename = "chart.png"
-    plt.savefig(filename)
-    plt.close()
-
-    return filename
 
 # ==============================
-# AI CAPTION
+# STRUCTURED INSIGHT
 # ==============================
 
-def generate_caption(data):
-  def generate_structured_insight(data):
+def generate_structured_insight(data):
     btc = data["bitcoin"]["usd"]
     btc_change = data["bitcoin"]["usd_24h_change"]
 
@@ -124,22 +85,44 @@ def generate_caption(data):
         "invalidation": invalidation,
         "scenario": scenario
     }
-      btc_change = data["bitcoin"]["usd_24h_change"]
 
-    if btc_change > 3:
-        tone = "Strong bullish momentum 🚀"
-    elif btc_change < -3:
-        tone = "Market correction phase ⚠️"
-    else:
-        tone = "Sideways consolidation 📊"
+# ==============================
+# CHART GENERATOR
+# ==============================
 
-    templates = [
-        f"{tone}\nTrade smart.",
-        f"{tone}\nRisk management first.",
-        f"{tone}\nWatch key levels."
-    ]
+def generate_chart():
+    coins = {
+        "bitcoin": "BTC",
+        "ethereum": "ETH",
+        "solana": "SOL"
+    }
 
-    return random.choice(templates)
+    plt.figure()
+
+    for coin_id, symbol in coins.items():
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+        params = {"vs_currency": "usd", "days": "1"}
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+
+        if "prices" not in data:
+            continue
+
+        prices = [p[1] for p in data["prices"]]
+        base = prices[0]
+        normalized = [(p/base)*100 for p in prices]
+
+        plt.plot(normalized, label=symbol)
+
+    plt.legend()
+    plt.title("24H Performance (%)")
+    plt.xlabel("Time")
+    plt.ylabel("Performance %")
+
+    filename = "chart.png"
+    plt.savefig(filename)
+    plt.close()
+    return filename
 
 # ==============================
 # TWITTER AUTH
@@ -166,51 +149,92 @@ api_v1 = tweepy.API(auth)
 
 def post_update():
     print("Running post_update...")
-
     data = get_market_data()
-
     if not data:
-        print("Market data failed. Skipping post.")
+        print("Market data failed.")
         return
 
     try:
         btc = data["bitcoin"]["usd"]
-        eth = data["ethereum"]["usd"]
-        sol = data["solana"]["usd"]
-
-        btc_change = data["bitcoin"]["usd_24h_change"]
-        eth_change = data["ethereum"]["usd_24h_change"]
-        sol_change = data["solana"]["usd_24h_change"]
-
-        def arrow(change):
-            return "🟢" if change >= 0 else "🔴"
-
-        caption = generate_caption(data)
+        insight = generate_structured_insight(data)
         chart = generate_chart()
 
-    insight = generate_structured_insight(data)
+        text = (
+            f"MARKET STRUCTURE UPDATE\n\n"
+            f"BTC Price: ${btc:,.0f}\n"
+            f"Bias: {insight['bias']}\n"
+            f"Key Level: ${insight['key_level']:,.0f}\n"
+            f"Invalidation: ${insight['invalidation']:,.0f}\n\n"
+            f"Scenario:\n{insight['scenario']}\n\n"
+            f"Manage risk properly."
+        )
 
-text = (
-    f"MARKET STRUCTURE UPDATE\n\n"
-    f"BTC Price: ${btc:,.0f}\n"
-    f"Bias: {insight['bias']}\n"
-    f"Key Level: ${insight['key_level']:,.0f}\n"
-    f"Invalidation: ${insight['invalidation']:,.0f}\n\n"
-    f"Scenario:\n{insight['scenario']}\n\n"
-    f"Manage risk properly."
-
-    if random.random() < 0.3:
-    text += "\n\n" + engagement_prompt()
-)
+        if random.random() < 0.3:
+            text += "\n\n" + engagement_prompt()
 
         media = api_v1.media_upload(chart)
         client.create_tweet(text=text, media_ids=[media.media_id])
 
-        print("Tweet posted successfully!")
+        print("Tweet posted!")
 
     except Exception as e:
-        print("Error in post_update:", e)
-        
+        print("Post error:", e)
+
+# ==============================
+# WEEKLY RECAP THREAD
+# ==============================
+
+def weekly_recap_thread():
+    data = get_market_data()
+    if not data:
+        return
+
+    btc = data["bitcoin"]["usd"]
+    btc_change = data["bitcoin"]["usd_24h_change"]
+
+    tweets = [
+        "WEEKLY CRYPTO RECAP 🧵",
+        f"BTC closed at ${btc:,.0f}",
+        f"Weekly change: {btc_change:.2f}%",
+        "Market structure remains intact unless key levels break.",
+        "Position smart. Protect capital."
+    ]
+
+    first = client.create_tweet(text=tweets[0])
+    reply_id = first.data["id"]
+
+    for t in tweets[1:]:
+        r = client.create_tweet(text=t, in_reply_to_tweet_id=reply_id)
+        reply_id = r.data["id"]
+
+# ==============================
+# DAILY THREAD
+# ==============================
+
+def daily_thread():
+    data = get_market_data()
+    if not data:
+        return
+
+    btc = data["bitcoin"]["usd"]
+    btc_change = data["bitcoin"]["usd_24h_change"]
+    direction = "bullish 🚀" if btc_change > 0 else "bearish ⚠️"
+
+    tweets = [
+        f"📊 Daily Crypto Insight\n\nBTC ${btc:.0f} ({btc_change:.2f}%)",
+        f"1️⃣ Market sentiment looks {direction}",
+        "2️⃣ Watch key resistance & support",
+        "3️⃣ Manage risk properly",
+        "Follow for structured crypto insight."
+    ]
+
+    first = client.create_tweet(text=tweets[0])
+    reply_id = first.data["id"]
+
+    for t in tweets[1:]:
+        r = client.create_tweet(text=t, in_reply_to_tweet_id=reply_id)
+        reply_id = r.data["id"]
+
 # ==============================
 # AUTO REPLY
 # ==============================
@@ -219,14 +243,10 @@ def auto_reply():
     global replied_ids
 
     me = client.get_me()
-    mentions = client.get_users_mentions(
-        id=me.data.id,
-        max_results=5
-    )
+    mentions = client.get_users_mentions(id=me.data.id, max_results=5)
 
     if mentions and mentions.data:
         for tweet in mentions.data:
-
             if str(tweet.id) in replied_ids:
                 continue
 
@@ -235,14 +255,11 @@ def auto_reply():
                     text="Thanks for engaging 🚀",
                     in_reply_to_tweet_id=tweet.id
                 )
-
                 replied_ids.add(str(tweet.id))
                 save_replied_id(tweet.id)
+            except:
+                pass
 
-                print(f"Replied to {tweet.id}")
-
-            except Exception as e:
-                print("Reply error:", e)
 # ==============================
 # SMART ENGAGEMENT
 # ==============================
@@ -259,60 +276,6 @@ def smart_engagement():
                 client.like(tweet.id)
             except:
                 pass
-                
-# ==============================
-# DAILY THREAD
-# ==============================
-
-def daily_thread():
-    def weekly_recap_thread():
-    data = get_market_data()
-    if not data:
-        return
-
-    btc = data["bitcoin"]["usd"]
-    btc_change = data["bitcoin"]["usd_24h_change"]
-
-    tweets = [
-        "WEEKLY CRYPTO RECAP 🧵",
-        f"BTC closed at ${btc:,.0f} this week.",
-        f"Weekly change: {btc_change:.2f}%",
-        "Market structure remains intact unless key levels break.",
-        "Position smart. Protect capital."
-    ]
-
-    first = client.create_tweet(text=tweets[0])
-    reply_id = first.data["id"]
-
-    for t in tweets[1:]:
-        r = client.create_tweet(text=t, in_reply_to_tweet_id=reply_id)
-        reply_id = r.data["id"]
-        
-    data = get_market_data()
-
-    # SAFETY CHECK
-    if not data:
-        print("Market data failed. Skipping thread.")
-        return
-
-    btc = data["bitcoin"]["usd"]
-    btc_change = data["bitcoin"]["usd_24h_change"]
-    direction = "bullish 🚀" if btc_change > 0 else "bearish ⚠️"
-
-    tweets = [
-        f"📊 Daily Crypto Insight\n\nBTC currently ${btc:.0f} ({btc_change:.2f}%)",
-        f"1️⃣ Market sentiment looks {direction}",
-        "2️⃣ Watch key resistance & support levels",
-        "3️⃣ Manage risk properly in volatile sessions",
-        "Follow for consistent crypto analysis 🔥"
-    ]
-
-    first = client.create_tweet(text=tweets[0])
-    reply_id = first.data["id"]
-
-    for t in tweets[1:]:
-        r = client.create_tweet(text=t, in_reply_to_tweet_id=reply_id)
-        reply_id = r.data["id"]
 
 # ==============================
 # SCHEDULE
@@ -320,7 +283,7 @@ def daily_thread():
 
 schedule.every().sunday.at("20:00").do(weekly_recap_thread)
 schedule.every().day.at("06:00").do(post_update)
-schedule.every().day.at("09:00").do(daily_thread)   # ← TAMBAH INI
+schedule.every().day.at("09:00").do(daily_thread)
 schedule.every().day.at("12:00").do(post_update)
 schedule.every().day.at("18:00").do(post_update)
 schedule.every().day.at("22:00").do(post_update)
@@ -330,8 +293,9 @@ schedule.every(30).minutes.do(smart_engagement)
 
 print("Bot started...")
 
-from flask import Flask
-import threading
+# ==============================
+# FLASK KEEP ALIVE
+# ==============================
 
 app = Flask(__name__)
 
