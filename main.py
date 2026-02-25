@@ -36,13 +36,22 @@ def generate_chart():
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
         params = {"vs_currency": "usd", "days": "1"}
         data = requests.get(url, params=params).json()
+
+        if "prices" not in data:
+            continue
+
         prices = [p[1] for p in data["prices"]]
-        plt.plot(prices, label=symbol)
+
+        # NORMALIZE supaya semua terlihat jelas
+        base = prices[0]
+        normalized = [(p/base)*100 for p in prices]
+
+        plt.plot(normalized, label=symbol)
 
     plt.legend()
-    plt.title("24H Crypto Price Chart")
+    plt.title("24H Performance (%)")
     plt.xlabel("Time")
-    plt.ylabel("Price USD")
+    plt.ylabel("Performance %")
 
     filename = "chart.png"
     plt.savefig(filename)
