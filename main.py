@@ -27,22 +27,21 @@ schedule.every().day.at("12:00").do(tweet_crypto)
 schedule.every().day.at("18:00").do(tweet_crypto)
 schedule.every().day.at("22:00").do(tweet_crypto)
 
-print("Bot started...")
+def run_schedule():
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
 
-# ===== WEB SERVER (WAJIB UNTUK RAILWAY) =====
+threading.Thread(target=run_schedule, daemon=True).start()
+
+# ===== FLASK (MAIN PROCESS) =====
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "Bot is running!"
 
-def run_web():
+if __name__ == "__main__":
+    print("Bot started...")
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
-
-threading.Thread(target=run_web).start()
-
-# ===== LOOP =====
-while True:
-    schedule.run_pending()
-    time.sleep(30)
