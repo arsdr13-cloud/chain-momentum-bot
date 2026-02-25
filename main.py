@@ -23,7 +23,6 @@ schedule.every().day.at("06:00").do(tweet_crypto)
 schedule.every().day.at("12:00").do(tweet_crypto)
 schedule.every().day.at("18:00").do(tweet_crypto)
 schedule.every().day.at("22:00").do(tweet_crypto)
-
 print("Bot started...")
 
 while True:
