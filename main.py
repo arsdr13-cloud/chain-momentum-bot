@@ -24,11 +24,10 @@ def tweet_crypto():
     client.create_tweet(text=message)
     print("Tweet sent!")
 
-schedule.every().day.at("06:00")
-schedule.every().day.at("12:00")
-schedule.every().day.at("18:00")
-schedule.every().day.at("22:00")
-
+schedule.every().day.at("06:00").do(tweet_crypto)
+schedule.every().day.at("12:00").do(tweet_crypto)
+schedule.every().day.at("18:00").do(tweet_crypto)
+schedule.every().day.at("22:00").do(tweet_crypto)
 print("Bot started...")
 
 while True:
