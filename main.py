@@ -7,6 +7,12 @@ import os
 import random
 
 # ==============================
+# GLOBAL MEMORY (ANTI DUPLICATE)
+# ==============================
+
+replied_ids = set()
+
+# ==============================
 # MARKET DATA
 # ==============================
 
@@ -163,16 +169,29 @@ SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%
 # AUTO REPLY
 # ==============================
 
-def auto_reply():
+def def auto_reply():
+    global replied_ids
+
     me = client.get_me()
     mentions = client.get_users_mentions(id=me.data.id, max_results=5)
 
-    if mentions.data:
+    if mentions and mentions.data:
         for tweet in mentions.data:
-            client.create_tweet(
-                text="Thanks for engaging 🚀",
-                in_reply_to_tweet_id=tweet.id
-            )
+
+            if tweet.id in replied_ids:
+                continue
+
+            try:
+                client.create_tweet(
+                    text="Thanks for engaging 🚀",
+                    in_reply_to_tweet_id=tweet.id
+                )
+
+                replied_ids.add(tweet.id)
+                print(f"Replied to {tweet.id}")
+
+            except Exception as e:
+                print("Reply error:", e)
 
 # ==============================
 # SMART ENGAGEMENT
