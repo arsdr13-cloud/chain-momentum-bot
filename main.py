@@ -11,14 +11,23 @@ import random
 # ==============================
 
 def get_market_data():
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        "ids": "bitcoin,ethereum,solana",
-        "vs_currencies": "usd",
-        "include_24hr_change": "true"
-    }
-    return requests.get(url, params=params).json()
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": "bitcoin,ethereum,solana",
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        }
+        response = requests.get(url, params=params, timeout=10)
 
+        if response.status_code != 200:
+            return None
+
+        return response.json()
+
+    except:
+        return None
+        
 # ==============================
 # CHART GENERATOR
 # ==============================
@@ -105,32 +114,52 @@ api_v1 = tweepy.API(auth)
 # ==============================
 
 def post_update():
+    print("Running post_update...")
+
     data = get_market_data()
 
-    btc = data["bitcoin"]["usd"]
-    eth = data["ethereum"]["usd"]
-    sol = data["solana"]["usd"]
+    # SAFETY CHECK
+    if not data:
+        print("Market data failed. Skipping post.")
+        return
 
-    caption = generate_caption(data)
-    chart = generate_chart()
+    try:
+        btc = data["bitcoin"]["usd"]
+        eth = data["ethereum"]["usd"]
+        sol = data["solana"]["usd"]
 
-    text = f"""
-🚀 Chain Momentum Update
+        caption = generate_caption(data)
+        chart = generate_chart()
 
-BTC: ${btc:.2f}
-ETH: ${eth:.2f}
-SOL: ${sol:.2f}
+        btc_change = data["bitcoin"]["usd_24h_change"]
+eth_change = data["ethereum"]["usd_24h_change"]
+sol_change = data["solana"]["usd_24h_change"]
 
+def arrow(change):
+    return "🟢" if change >= 0 else "🔴"
+
+text = f"""
+📊 Market Snapshot
+
+BTC ${btc:,.0f} {arrow(btc_change)} {btc_change:.2f}%
+ETH ${eth:,.0f} {arrow(eth_change)} {eth_change:.2f}%
+SOL ${sol:,.0f} {arrow(sol_change)} {sol_change:.2f}%
+
+24H Insight:
 {caption}
 
-#Crypto #BTC #ETH #SOL
+#Crypto #Bitcoin #Ethereum #Solana
+"""
 """
 
-    media = api_v1.media_upload(chart)
-    client.create_tweet(text=text, media_ids=[media.media_id])
+        media = api_v1.media_upload(chart)
+        client.create_tweet(text=text, media_ids=[media.media_id])
 
-    print("Tweet posted!")
+        print("Tweet posted successfully!")
 
+    except Exception as e:
+        print("Error in post_update:", e)
+        
 # ==============================
 # AUTO REPLY
 # ==============================
