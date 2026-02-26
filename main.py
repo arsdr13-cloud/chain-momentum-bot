@@ -47,7 +47,6 @@ def send_telegram(text):
 
 # ================= TWITTER =================
 
-def post_twitter(text):
 def post_twitter(message):
     try:
         consumer_key = os.getenv("TW_API_KEY")
