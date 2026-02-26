@@ -20,7 +20,7 @@ TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
 
 SCAN_INTERVAL = 15
 TIMEFRAME = "4H"
-RR_RATIO = 2  # Risk Reward 1:2
+RR_RATIO = 2
 
 PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT"]
 
@@ -31,24 +31,37 @@ logging.basicConfig(level=logging.INFO)
 # ================= TELEGRAM =================
 
 def send_telegram(text):
-    if not BOT_TOKEN or not CHAT_ID:
-        return
+    try:
+        if not BOT_TOKEN or not CHAT_ID:
+            return
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": CHAT_ID, "text": text})
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+        requests.post(
+            url,
+            json={"chat_id": CHAT_ID, "text": text},
+            timeout=10
+        )
+    except Exception as e:
+        logging.error(f"Telegram error: {e}")
 
 # ================= TWITTER =================
 
 def post_twitter(text):
     try:
+        if not TW_API_KEY:
+            return
+
         auth = tweepy.OAuth1UserHandler(
             TW_API_KEY,
             TW_API_SECRET,
             TW_ACCESS_TOKEN,
             TW_ACCESS_SECRET
         )
+
         api = tweepy.API(auth)
         api.update_status(text[:280])
+
     except Exception as e:
         logging.error(f"Twitter error: {e}")
 
@@ -57,16 +70,23 @@ def post_twitter(text):
 def fetch_data(symbol):
     try:
         coin = symbol.replace("USDT","").lower()
+
         url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
-        params = {"vs_currency":"usd","days":"120","interval":"daily"}
 
-        r = requests.get(url, params=params)
+        params = {
+            "vs_currency":"usd",
+            "days":"120",
+            "interval":"daily"
+        }
 
-        if r.status_code == 429:
-            time.sleep(30)
+        r = requests.get(url, params=params, timeout=15)
+
+        if r.status_code != 200:
             return None
 
-        data = r.json()["prices"]
+        data = r.json().get("prices")
+        if not data:
+            return None
 
         df = pd.DataFrame(data, columns=["timestamp","close"])
         df["close"] = df["close"].astype(float)
@@ -80,98 +100,115 @@ def fetch_data(symbol):
         delta = df["close"].diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
+
         rs = gain.rolling(14).mean() / loss.rolling(14).mean()
         df["rsi"] = 100 - (100/(1+rs))
 
         return df
 
-    except:
+    except Exception as e:
+        logging.error(f"{symbol} fetch error: {e}")
         return None
 
 # ================= SIGNAL =================
 
 def detect_signal(df):
-    if len(df) < 210:
-        return None
-
-    last = df.iloc[-1]
-
-    trend_up = last["ema50"] > last["ema200"]
-    trend_down = last["ema50"] < last["ema200"]
-
-    breakout_up = last["close"] > df["close"].rolling(20).max().iloc[-2]
-    breakout_down = last["close"] < df["close"].rolling(20).min().iloc[-2]
-
-    rsi_ok_buy = 45 < last["rsi"] < 65
-    rsi_ok_sell = 35 < last["rsi"] < 55
-
-    if trend_up and breakout_up and rsi_ok_buy:
-        return "BUY"
-
-    if trend_down and breakout_down and rsi_ok_sell:
-        return "SELL"
-
-    return None
-
-# ================= SCANNER =================
-
-def scan():
-    for symbol in PAIRS:
-        time.sleep(2)
-
-        df = fetch_data(symbol)
-        if df is None:
-            continue
-
-        signal = detect_signal(df)
-        if not signal:
-            continue
-
-        if last_signal.get(symbol) == signal:
-            continue
+    try:
+        if len(df) < 210:
+            return None
 
         last = df.iloc[-1]
-        entry = last["close"]
-        atr = last["atr"]
 
-        if signal == "BUY":
-            sl = entry - atr
-            tp = entry + (atr * RR_RATIO)
-        else:
-            sl = entry + atr
-            tp = entry - (atr * RR_RATIO)
+        trend_up = last["ema50"] > last["ema200"]
+        trend_down = last["ema50"] < last["ema200"]
 
-        msg = f"""
-🔥 ELITE {signal} SIGNAL ({TIMEFRAME})
+        breakout_up = last["close"] > df["close"].rolling(20).max().iloc[-2]
+        breakout_down = last["close"] < df["close"].rolling(20).min().iloc[-2]
+
+        rsi_buy = 45 < last["rsi"] < 65
+        rsi_sell = 35 < last["rsi"] < 55
+
+        if trend_up and breakout_up and rsi_buy:
+            return "BUY"
+
+        if trend_down and breakout_down and rsi_sell:
+            return "SELL"
+
+        return None
+
+    except Exception as e:
+        logging.error(f"Signal error: {e}")
+        return None
+
+# ================= SCAN =================
+
+def scan():
+    logging.info("Scanning market...")
+
+    for symbol in PAIRS:
+        try:
+            time.sleep(1)
+
+            df = fetch_data(symbol)
+            if df is None:
+                continue
+
+            signal = detect_signal(df)
+            if not signal:
+                continue
+
+            if last_signal.get(symbol) == signal:
+                continue
+
+            last = df.iloc[-1]
+            entry = last["close"]
+            atr = last["atr"]
+
+            if pd.isna(atr):
+                continue
+
+            if signal == "BUY":
+                sl = entry - atr
+                tp = entry + (atr * RR_RATIO)
+            else:
+                sl = entry + atr
+                tp = entry - (atr * RR_RATIO)
+
+            message = f"""🔥 ELITE {signal} SIGNAL ({TIMEFRAME})
 
 Pair: {symbol}
 Entry: {round(entry,4)}
 Stop Loss: {round(sl,4)}
 Take Profit: {round(tp,4)}
 Risk:Reward 1:{RR_RATIO}
-ATR Based Dynamic SL
-"""
+ATR Dynamic SL"""
 
-        send_telegram(msg)
-        post_twitter(msg)
+            send_telegram(message)
+            post_twitter(message)
 
-        last_signal[symbol] = signal
+            last_signal[symbol] = signal
 
-# ================= DAILY SUMMARY =================
+        except Exception as e:
+            logging.error(f"{symbol} scan error: {e}")
+
+# ================= SUMMARY =================
 
 def daily_summary():
-    text = "📊 Daily Market Scan Completed (ELITE BOT)"
-    send_telegram(text)
+    send_telegram("📊 Daily Market Scan Completed (ELITE BOT)")
 
 # ================= SCHEDULER =================
 
-def scheduler():
+def run_scheduler():
     schedule.every(SCAN_INTERVAL).minutes.do(scan)
     schedule.every().day.at("23:00").do(daily_summary)
 
     while True:
-        schedule.run_pending()
-        time.sleep(5)
+        try:
+            schedule.run_pending()
+            time.sleep(5)
+        except Exception as e:
+            logging.error(f"Scheduler error: {e}")
+            time.sleep(5)
 
 # ================= FLASK =================
 
@@ -181,12 +218,21 @@ app = Flask(__name__)
 def home():
     return "ELITE BOT RUNNING", 200
 
-def start():
-    thread = threading.Thread(target=scheduler)
-    thread.daemon = True
-    thread.start()
+# ================= START BACKGROUND =================
 
-start()
+def start_background():
+    try:
+        thread = threading.Thread(target=run_scheduler)
+        thread.daemon = True
+        thread.start()
 
-send_telegram("🚀 ELITE Crypto Signal Bot ACTIVE")
+        logging.info("Scheduler started")
 
+        if BOT_TOKEN and CHAT_ID:
+            send_telegram("🚀 ELITE Crypto Signal Bot ACTIVE")
+
+    except Exception as e:
+        logging.error(f"Startup error: {e}")
+
+# Dipanggil saat Gunicorn load app
+start_background()
