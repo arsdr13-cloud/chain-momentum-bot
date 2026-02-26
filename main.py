@@ -233,6 +233,25 @@ def start_background():
 
     except Exception as e:
         logging.error(f"Startup error: {e}")
+    
 
-# Dipanggil saat Gunicorn load app
-start_background()
+# ================= START BACKGROUND SAFELY =================
+
+def start_background():
+    if os.environ.get("RUN_MAIN") == "true":
+        return
+
+    thread = threading.Thread(target=run_scheduler)
+    thread.daemon = True
+    thread.start()
+
+    logging.info("Scheduler started")
+
+    if BOT_TOKEN and CHAT_ID:
+        send_telegram("🚀 ELITE Crypto Signal Bot ACTIVE")
+
+# Gunicorn hook
+@app.before_first_request
+def activate_scheduler():
+    start_background()
+
