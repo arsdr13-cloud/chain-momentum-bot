@@ -184,6 +184,8 @@ app = Flask(__name__)
 def health():
     return "Bot Running (Signal + Report)", 200
 
+start_background()
+
 # ================= START BACKGROUND =================
 def start_background():
     thread = threading.Thread(target=run_scheduler)
