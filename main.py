@@ -6,8 +6,7 @@ import requests
 import pandas as pd
 from flask import Flask
 import tweepy
-from apscheduler.schedulers.background 
-import BackgroundScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
 # ================= CONFIG =================
 
