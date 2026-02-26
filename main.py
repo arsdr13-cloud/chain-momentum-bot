@@ -200,14 +200,15 @@ def daily_summary():
 
 # ================= SCHEDULER =================
 
-    logging.info("🚀 ELITE BOT STARTED")
-    scheduler.start()
-    
-    scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
-    scheduler.add_job(scan, 'cron', hour='*/4', minute=3)
-    scheduler.start()
+    # ================= START BOT =================
 
-    logging.info("🚀 ELITE BOT STARTED")
+logging.info("🚀 ELITE BOT STARTED")
+
+scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
+scheduler.add_job(scan, 'cron', hour='*/4', minute=3)
+scheduler.start()
+
+
 # ================= FLASK =================
 
 app = Flask(__name__)
