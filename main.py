@@ -5,221 +5,187 @@ import threading
 import requests
 import schedule
 import pandas as pd
-import ta
 from flask import Flask
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
-print("🔥 COINGECKO VERSION ACTIVE 🔥")
+import tweepy
 
 # ================= CONFIG =================
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
-TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
-TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
-TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
+TW_API_KEY = os.getenv("TW_API_KEY")
+TW_API_SECRET = os.getenv("TW_API_SECRET")
+TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
+TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
 
-TIMEFRAME = "4h"
-SCAN_INTERVAL_MIN = 1
+SCAN_INTERVAL = 15
+TIMEFRAME = "4H"
+RR_RATIO = 2  # Risk Reward 1:2
 
-COINS = ["bitcoin", "ethereum", "solana"]
-PAIRS = [
-    "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
-    "ADAUSDT","DOGEUSDT","AVAXUSDT","DOTUSDT","LINKUSDT"
-]
+PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT"]
 
 last_signal = {}
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.INFO)
 
 # ================= TELEGRAM =================
-def send_telegram(text):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    r = requests.post(url, json={"chat_id": CHAT_ID, "text": text})
-    logging.info(f"TG: {r.status_code}")
 
-def send_telegram_photo(filepath):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-    with open(filepath, "rb") as photo:
-        requests.post(url, data={"chat_id": CHAT_ID}, files={"photo": photo})
+def send_telegram(text):
+    if not BOT_TOKEN or not CHAT_ID:
+        return
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    requests.post(url, json={"chat_id": CHAT_ID, "text": text})
 
 # ================= TWITTER =================
+
 def post_twitter(text):
     try:
-        import tweepy
-        client = tweepy.Client(
-            consumer_key=TWITTER_API_KEY,
-            consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN,
-            access_token_secret=TWITTER_ACCESS_SECRET
+        auth = tweepy.OAuth1UserHandler(
+            TW_API_KEY,
+            TW_API_SECRET,
+            TW_ACCESS_TOKEN,
+            TW_ACCESS_SECRET
         )
-        client.create_tweet(text=text[:280])
+        api = tweepy.API(auth)
+        api.update_status(text[:280])
     except Exception as e:
-        logging.error(f"X error: {e}")
+        logging.error(f"Twitter error: {e}")
 
-# ================= DAILY REPORT =================
-def generate_chart(coin):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
-    params = {"vs_currency": "usd", "days": "1"}
-    r = requests.get(url, params=params)
-    data = r.json()
-    prices = [p[1] for p in data["prices"]]
+# ================= DATA FETCH =================
 
-    plt.figure()
-    plt.plot(prices)
-    plt.title(f"{coin.upper()} 24H Chart")
-    filename = f"{coin}.png"
-    plt.savefig(filename)
-    plt.close()
-    return filename
-
-def daily_report():
-    logging.info("Daily report running...")
-    for coin in COINS:
-        file = generate_chart(coin)
-        send_telegram_photo(file)
-    msg = "📊 Daily Crypto Update is live!"
-    send_telegram(msg)
-    post_twitter(msg)
-
-def weekly_report():
-    msg = "📅 Weekly Crypto Recap is live!"
-    send_telegram(msg)
-    post_twitter(msg)
-
-# ================= SIGNAL ENGINE =================
-
-def fetch_klines(symbol):
+def fetch_data(symbol):
     try:
-        # mapping symbol ke coingecko id
-        symbol_map = {
-            "BTCUSDT": "bitcoin",
-            "ETHUSDT": "ethereum",
-            "SOLUSDT": "solana",
-            "BNBUSDT": "binancecoin",
-            "XRPUSDT": "ripple",
-            "ADAUSDT": "cardano",
-            "DOGEUSDT": "dogecoin",
-            "AVAXUSDT": "avalanche-2",
-            "DOTUSDT": "polkadot",
-            "LINKUSDT": "chainlink"
-        }
-
-        coin_id = symbol_map.get(symbol)
-        if not coin_id:
-            return None
-
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
-
-        # 4H timeframe → gunakan 7 hari data
-        params = {
-            "vs_currency": "usd",
-            "days": 7
-        }
+        coin = symbol.replace("USDT","").lower()
+        url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
+        params = {"vs_currency":"usd","days":"120","interval":"daily"}
 
         r = requests.get(url, params=params)
-        data = r.json()
 
-        if not isinstance(data, list):
-            logging.error(f"{symbol} CoinGecko error: {data}")
+        if r.status_code == 429:
+            time.sleep(30)
             return None
 
-        df = pd.DataFrame(data, columns=[
-            "timestamp", "open", "high", "low", "close"
-        ])
+        data = r.json()["prices"]
 
-        # CoinGecko tidak ada volume → buat dummy volume
-        df["volume"] = 1
+        df = pd.DataFrame(data, columns=["timestamp","close"])
+        df["close"] = df["close"].astype(float)
+
+        df["ema50"] = df["close"].ewm(span=50).mean()
+        df["ema200"] = df["close"].ewm(span=200).mean()
+
+        df["tr"] = abs(df["close"] - df["close"].shift())
+        df["atr"] = df["tr"].rolling(14).mean()
+
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+        df["rsi"] = 100 - (100/(1+rs))
 
         return df
 
-    except Exception as e:
-        logging.error(f"{symbol} fetch error: {e}")
+    except:
         return None
+
+# ================= SIGNAL =================
+
 def detect_signal(df):
-    df["ema50"] = ta.trend.ema_indicator(df["close"], window=50)
-    df["ema200"] = ta.trend.ema_indicator(df["close"], window=200)
-    df["rsi"] = ta.momentum.rsi(df["close"], window=14)
-    
+    if len(df) < 210:
+        return None
 
     last = df.iloc[-1]
-    prev = df.iloc[-6:-1]
 
-    trend_bull = last["ema50"] > last["ema200"]
-    trend_bear = last["ema50"] < last["ema200"]
+    trend_up = last["ema50"] > last["ema200"]
+    trend_down = last["ema50"] < last["ema200"]
 
-    breakout_up = last["close"] > prev["high"].max()
-    breakout_down = last["close"] < prev["low"].min()
+    breakout_up = last["close"] > df["close"].rolling(20).max().iloc[-2]
+    breakout_down = last["close"] < df["close"].rolling(20).min().iloc[-2]
 
-    volume_confirm = True
+    rsi_ok_buy = 45 < last["rsi"] < 65
+    rsi_ok_sell = 35 < last["rsi"] < 55
 
-    rsi_buy = 35 < last["rsi"] < 55
-    rsi_sell = 45 < last["rsi"] < 65
-
-    # STRONG BUY
-    if trend_bull and breakout_up and volume_confirm and rsi_buy:
+    if trend_up and breakout_up and rsi_ok_buy:
         return "BUY"
 
-    # STRONG SELL
-    if trend_bear and breakout_down and volume_confirm and rsi_sell:
+    if trend_down and breakout_down and rsi_ok_sell:
         return "SELL"
 
     return None
-    
-def scan_market():
-    logging.info("Scanning signals...")
+
+# ================= SCANNER =================
+
+def scan():
     for symbol in PAIRS:
-        try:
-            df = fetch_klines(symbol)
+        time.sleep(2)
 
-            if df is None or len(df) < 210:
-                continue
+        df = fetch_data(symbol)
+        if df is None:
+            continue
 
-            direction = detect_signal(df)
+        signal = detect_signal(df)
+        if not signal:
+            continue
 
-            if not direction:
-                continue
+        if last_signal.get(symbol) == signal:
+            continue
 
-            if last_signal.get(symbol) == direction:
-                continue
+        last = df.iloc[-1]
+        entry = last["close"]
+        atr = last["atr"]
 
-            entry = df.iloc[-1]["close"]
-            message = f"🚀 {symbol} {direction} SIGNAL (4H)\nEntry: {entry}"
-            send_telegram(message)
-            post_twitter(message)
-            last_signal[symbol] = direction
+        if signal == "BUY":
+            sl = entry - atr
+            tp = entry + (atr * RR_RATIO)
+        else:
+            sl = entry + atr
+            tp = entry - (atr * RR_RATIO)
 
-        except Exception as e:
-            logging.error(f"{symbol} error: {e}")
+        msg = f"""
+🔥 ELITE {signal} SIGNAL ({TIMEFRAME})
+
+Pair: {symbol}
+Entry: {round(entry,4)}
+Stop Loss: {round(sl,4)}
+Take Profit: {round(tp,4)}
+Risk:Reward 1:{RR_RATIO}
+ATR Based Dynamic SL
+"""
+
+        send_telegram(msg)
+        post_twitter(msg)
+
+        last_signal[symbol] = signal
+
+# ================= DAILY SUMMARY =================
+
+def daily_summary():
+    text = "📊 Daily Market Scan Completed (ELITE BOT)"
+    send_telegram(text)
+
 # ================= SCHEDULER =================
-def run_scheduler():
-    schedule.every(SCAN_INTERVAL_MIN).minutes.do(scan_market)
-    schedule.every().day.at("09:00").do(daily_report)
-    schedule.every().monday.at("20:00").do(weekly_report)
+
+def scheduler():
+    schedule.every(SCAN_INTERVAL).minutes.do(scan)
+    schedule.every().day.at("23:00").do(daily_summary)
 
     while True:
         schedule.run_pending()
-        time.sleep(10)
+        time.sleep(5)
 
 # ================= FLASK =================
+
 app = Flask(__name__)
 
 @app.route("/")
-def health():
-    return "Bot Running (Signal + Report)", 200
+def home():
+    return "ELITE BOT RUNNING", 200
 
-# ================= START BACKGROUND =================
-def start_background():
-    thread = threading.Thread(target=run_scheduler)
+def start():
+    thread = threading.Thread(target=scheduler)
     thread.daemon = True
     thread.start()
-    logging.info("Scheduler started")
 
+start()
 
-# JALANKAN SAAT GUNICORN LOAD APP
-start_background()
-# TEST TELEGRAM SAAT START
-send_telegram("✅ Bot berhasil start di Railway")
+send_telegram("🚀 ELITE Crypto Signal Bot ACTIVE")
