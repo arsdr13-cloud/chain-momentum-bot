@@ -223,18 +223,18 @@ def home():
 # ================= START BACKGROUND SAFELY =================
 
 def start_background():
-    if os.environ.get("RUN_MAIN") == "true":
-        return
+    def safe_runner():
+        try:
+            run_scheduler()
+        except Exception as e:
+            logging.error(f"Scheduler crashed: {e}")
 
-    thread = threading.Thread(target=run_scheduler)
+    thread = threading.Thread(target=safe_runner)
     thread.daemon = True
     thread.start()
 
     logging.info("Scheduler started")
 
-    if BOT_TOKEN and CHAT_ID:
-        send_telegram("🚀 ELITE Crypto Signal Bot ACTIVE")
-
-    if __name__ != "__main__":
+# Start background only once
+if os.environ.get("RAILWAY_ENVIRONMENT"):
     start_background()
-
