@@ -200,7 +200,7 @@ def daily_summary():
 
 # ================= SCHEDULER =================
 
-if __name__ == "__main__":
+    logging.info("🚀 ELITE BOT STARTED")
     scheduler.start()
     
     scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
@@ -217,8 +217,7 @@ def home():
     return "ELITE BOT RUNNING", 200
 
 
-    send_telegram("TEST SIGNAL")
-    post_twitter("TEST SIGNAL")
+    
 
 
 
