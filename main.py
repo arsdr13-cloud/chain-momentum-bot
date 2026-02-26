@@ -7,16 +7,14 @@ import schedule
 from flask import Flask
 
 # ==============================
-# IMPORTANT FOR SERVER ENV
+# SERVER SAFE BACKEND
 # ==============================
 import matplotlib
 matplotlib.use("Agg")
-
 import matplotlib.pyplot as plt
-from datetime import datetime
 
 # ==============================
-# LOGGING SETUP
+# LOGGING
 # ==============================
 logging.basicConfig(
     level=logging.INFO,
@@ -24,28 +22,31 @@ logging.basicConfig(
 )
 
 # ==============================
-# FLASK APP
+# FLASK APP (HEALTH CHECK)
 # ==============================
 app = Flask(__name__)
 
 @app.route("/")
 def health():
-    return "OK", 200
+    return "Bot is running", 200
 
 
 # ==============================
-# CONFIG
+# ENV VARIABLES
 # ==============================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-print("BOT_TOKEN =", BOT_TOKEN)
-print("CHAT_ID =", CHAT_ID)
+TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
+TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
+TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
+TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
 
 COINS = ["bitcoin", "ethereum", "solana"]
 
+
 # ==============================
-# TELEGRAM SEND FUNCTION
+# TELEGRAM
 # ==============================
 def send_telegram_message(text):
     try:
@@ -53,12 +54,48 @@ def send_telegram_message(text):
         payload = {
             "chat_id": CHAT_ID,
             "text": text,
-            "parse_mode": "Markdown"
         }
         r = requests.post(url, json=payload, timeout=10)
-        logging.info(f"Telegram response: {r.status_code}")
+        logging.info(f"Telegram text status: {r.status_code}")
     except Exception as e:
-        logging.error(f"Telegram send error: {e}")
+        logging.error(f"Telegram error: {e}")
+
+
+def send_telegram_photo(filepath):
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+        with open(filepath, "rb") as photo:
+            r = requests.post(
+                url,
+                data={"chat_id": CHAT_ID},
+                files={"photo": photo},
+                timeout=15
+            )
+        logging.info(f"Telegram photo status: {r.status_code}")
+    except Exception as e:
+        logging.error(f"Telegram photo error: {e}")
+
+
+# ==============================
+# TWITTER (X)
+# ==============================
+def post_to_twitter(text):
+    try:
+        import tweepy
+
+        auth = tweepy.OAuth1UserHandler(
+            TWITTER_API_KEY,
+            TWITTER_API_SECRET,
+            TWITTER_ACCESS_TOKEN,
+            TWITTER_ACCESS_SECRET
+        )
+
+        api = tweepy.API(auth)
+        api.update_status(text)
+        logging.info("Tweet posted successfully")
+
+    except Exception as e:
+        logging.error(f"Twitter error: {e}")
 
 
 # ==============================
@@ -67,21 +104,14 @@ def send_telegram_message(text):
 def generate_chart(coin):
     try:
         url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
-        params = {
-            "vs_currency": "usd",
-            "days": "1"
-        }
+        params = {"vs_currency": "usd", "days": "1"}
 
         response = requests.get(url, params=params, timeout=10)
 
         if response.status_code != 200:
-            logging.warning(f"{coin} API error {response.status_code}")
             return None
 
         data = response.json()
-        if "prices" not in data:
-            return None
-
         prices = [p[1] for p in data["prices"]]
 
         plt.figure()
@@ -107,35 +137,26 @@ def daily_report():
     logging.info("Running daily report...")
 
     for coin in COINS:
-        filename = generate_chart(coin)
+        file = generate_chart(coin)
+        if file:
+            send_telegram_photo(file)
 
-        if filename:
-            try:
-                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-                with open(filename, "rb") as photo:
-                    requests.post(
-                        url,
-                        data={"chat_id": CHAT_ID},
-                        files={"photo": photo},
-                        timeout=15
-                    )
-                logging.info(f"{coin} chart sent")
-            except Exception as e:
-                logging.error(f"Send photo error: {e}")
-
-    send_telegram_message("📊 Daily Crypto Update selesai.")
+    message = "📊 Daily Crypto Update (BTC, ETH, SOL) is live!"
+    send_telegram_message(message)
+    post_to_twitter(message)
 
 
 # ==============================
 # WEEKLY REPORT
 # ==============================
 def weekly_report():
-    logging.info("Running weekly report...")
-    send_telegram_message("📅 Weekly market recap is live.")
+    message = "📅 Weekly Crypto Recap is live. Stay sharp!"
+    send_telegram_message(message)
+    post_to_twitter(message)
 
 
 # ==============================
-# SCHEDULER LOOP
+# SCHEDULER
 # ==============================
 def run_scheduler():
     logging.info("Scheduler started")
@@ -144,17 +165,23 @@ def run_scheduler():
     schedule.every().monday.at("20:00").do(weekly_report)
 
     while True:
-        try:
-            schedule.run_pending()
-        except Exception as e:
-            logging.error(f"Scheduler error: {e}")
+        schedule.run_pending()
         time.sleep(30)
 
 
 # ==============================
-# START BACKGROUND THREAD
+# START EVERYTHING
 # ==============================
-scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-scheduler_thread.start()
+def start_background():
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    logging.info("Bot started successfully")
 
-logging.info("Bot started successfully")
+start_background()
+
+
+# ==============================
+# RUN FLASK (Railway compatible)
+# ==============================
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
