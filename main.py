@@ -184,4 +184,13 @@ app = Flask(__name__)
 def health():
     return "Bot Running (Signal + Report)", 200
 
+# ================= START BACKGROUND =================
+def start_background():
+    thread = threading.Thread(target=run_scheduler)
+    thread.daemon = True
+    thread.start()
+    logging.info("Scheduler started")
+
+
+# JALANKAN SAAT GUNICORN LOAD APP
 start_background()
