@@ -191,6 +191,9 @@ ATR Dynamic SL"""
         except Exception as e:
             logging.error(f"{symbol} scan error: {e}")
 
+send_telegram("TEST SIGNAL")
+post_twitter("TEST SIGNAL")
+
 # ================= SUMMARY =================
 
 def daily_summary():
@@ -239,5 +242,4 @@ def start_background():
 if os.environ.get("RAILWAY_ENVIRONMENT"):
     start_background()
 
-send_telegram("TEST SIGNAL")
-post_twitter("TEST SIGNAL")
+
