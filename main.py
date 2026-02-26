@@ -190,4 +190,6 @@ def start_background():
     thread.start()
     logging.info("Scheduler started")
 
-start_background()
+if __name__ == "__main__":
+    start_background()
+    app.run(host="0.0.0.0", port=8080)
