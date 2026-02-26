@@ -142,7 +142,6 @@ def detect_signal(df):
     return None
 
 def scan_market():
-def scan_market():
     logging.info("Scanning signals...")
     for symbol in PAIRS:
         try:
