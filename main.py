@@ -204,9 +204,14 @@ def daily_summary():
 
 logging.info("🚀 ELITE BOT STARTED")
 
-scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
-scheduler.add_job(scan, 'interval',minute=1)
-scheduler.start()
+import threading
+
+def run_scheduler():
+    while True:
+        scan()
+        time.sleep(60)   # 60 detik untuk test
+
+threading.Thread(target=run_scheduler, daemon=True).start()
 
 
 # ================= FLASK =================
