@@ -212,8 +212,7 @@ def run_scheduler():
         time.sleep(60)   # 60 detik untuk test
 
 threading.Thread(target=run_scheduler, daemon=True).start()
-send_telegram("🔥 TEST MESSAGE BOT AKTIF")
-post_twitter("🔥 TEST MESSAGE BOT AKTIF")
+
 
 # ================= FLASK =================
 
