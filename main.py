@@ -142,15 +142,16 @@ def detect_signal(df):
     return None
 
 def scan_market():
+def scan_market():
     logging.info("Scanning signals...")
     for symbol in PAIRS:
         try:
             df = fetch_klines(symbol)
 
-if df is None or len(df) < 210:
-    continue
+            if df is None or len(df) < 210:
+                continue
 
-direction = detect_signal(df)
+            direction = detect_signal(df)
 
             if not direction:
                 continue
@@ -166,7 +167,6 @@ direction = detect_signal(df)
 
         except Exception as e:
             logging.error(f"{symbol} error: {e}")
-
 # ================= SCHEDULER =================
 def run_scheduler():
     schedule.every(SCAN_INTERVAL_MIN).minutes.do(scan_market)
