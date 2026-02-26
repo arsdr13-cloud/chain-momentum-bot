@@ -250,8 +250,6 @@ def start_background():
     if BOT_TOKEN and CHAT_ID:
         send_telegram("🚀 ELITE Crypto Signal Bot ACTIVE")
 
-# Gunicorn hook
-@app.before_first_request
-def activate_scheduler():
+    if __name__ != "__main__":
     start_background()
 
