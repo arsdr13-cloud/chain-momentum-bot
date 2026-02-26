@@ -93,12 +93,25 @@ def fetch_klines(symbol):
     url = "https://api.binance.com/api/v3/klines"
     params = {"symbol": symbol, "interval": TIMEFRAME, "limit": 300}
     r = requests.get(url, params=params)
+
+    if r.status_code != 200:
+        logging.error(f"{symbol} API error: {r.text}")
+        return None
+
     data = r.json()
+
+    if not data or len(data) < 210:
+        logging.warning(f"{symbol} not enough data")
+        return None
+
     df = pd.DataFrame(data, columns=[
         "open_time","open","high","low","close","volume",
         "close_time","qav","trades","tbbav","tbqav","ignore"
     ])
-    df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
+
+    df[["open","high","low","close","volume"]] = \
+        df[["open","high","low","close","volume"]].astype(float)
+
     return df
 
 def detect_signal(df):
@@ -133,7 +146,11 @@ def scan_market():
     for symbol in PAIRS:
         try:
             df = fetch_klines(symbol)
-            direction = detect_signal(df)
+
+if df is None or len(df) < 210:
+    continue
+
+direction = detect_signal(df)
 
             if not direction:
                 continue
