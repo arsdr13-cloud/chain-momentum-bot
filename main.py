@@ -141,7 +141,36 @@ def fetch_klines(symbol):
     except Exception as e:
         logging.error(f"{symbol} fetch error: {e}")
         return None
+def detect_signal(df):
+    df["ema50"] = ta.trend.ema_indicator(df["close"], window=50)
+    df["ema200"] = ta.trend.ema_indicator(df["close"], window=200)
+    df["rsi"] = ta.momentum.rsi(df["close"], window=14)
+    df["vol_ma"] = df["volume"].rolling(20).mean()
 
+    last = df.iloc[-1]
+    prev = df.iloc[-6:-1]
+
+    trend_bull = last["ema50"] > last["ema200"]
+    trend_bear = last["ema50"] < last["ema200"]
+
+    breakout_up = last["close"] > prev["high"].max()
+    breakout_down = last["close"] < prev["low"].min()
+
+    volume_confirm = last["volume"] > last["vol_ma"]
+
+    rsi_buy = 35 < last["rsi"] < 55
+    rsi_sell = 45 < last["rsi"] < 65
+
+    # STRONG BUY
+    if trend_bull and breakout_up and volume_confirm and rsi_buy:
+        return "BUY"
+
+    # STRONG SELL
+    if trend_bear and breakout_down and volume_confirm and rsi_sell:
+        return "SELL"
+
+    return None
+    
 def scan_market():
     logging.info("Scanning signals...")
     for symbol in PAIRS:
