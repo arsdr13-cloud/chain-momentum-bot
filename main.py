@@ -194,3 +194,5 @@ def start_background():
 
 # JALANKAN SAAT GUNICORN LOAD APP
 start_background()
+# TEST TELEGRAM SAAT START
+send_telegram("✅ Bot berhasil start di Railway")
