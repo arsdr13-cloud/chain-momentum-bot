@@ -1,7 +1,6 @@
 import os
 import time
 import logging
-import threading
 import requests
 import pandas as pd
 from flask import Flask
