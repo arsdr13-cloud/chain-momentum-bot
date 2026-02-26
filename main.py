@@ -21,8 +21,13 @@ SCAN_INTERVAL = 15
 TIMEFRAME = "4H"
 RR_RATIO = 2
 
-PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT"]
+PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT"]
 
+COINGECKO_IDS = {
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "SOLUSDT": "solana"
+}
 last_signal = {}
 
 logging.basicConfig(level=logging.INFO)
@@ -64,8 +69,9 @@ def post_twitter(message):
 # ================= DATA FETCH =================
 
 def fetch_data(symbol):
-    try:
-        coin = symbol.replace("USDT","").lower()
+    try:coin = COINGECKO_IDS.get(symbol)
+if not coin:
+    return None
 
         url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
 
@@ -141,7 +147,7 @@ def detect_signal(df):
 def scan():
     logging.info("=== SCANNING MULTI COIN ===")
 
-    coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    for symbol in PAIRS:["BTCUSDT", "ETHUSDT", "SOLUSDT"]
     full_message = "🚨 MARKET SCAN REPORT 🚨\n"
 
     try:
@@ -206,7 +212,9 @@ def start_scheduler():
 
     scheduler.start()
     logging.info("Scheduler Multi Coin Started")
-
+# AUTO START SCHEDULER (untuk gunicorn/railway)
+if not scheduler.running:
+    start_scheduler()
 
 # ================= FLASK =================
 
@@ -219,5 +227,5 @@ def home():
 
 # ================== MAIN ==================
 if __name__ == "__main__":
-    start_scheduler()   # ✅ PANGGIL DI SINI
     app.run(host="0.0.0.0", port=8080)
+    
