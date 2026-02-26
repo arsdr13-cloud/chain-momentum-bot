@@ -139,6 +139,7 @@ def detect_signal(df):
 # ================= SCAN =================
 
 def scan():
+    global scan_running
     logging.info("=== SCANNING MARKET ===")
 
     for symbol in PAIRS:
@@ -200,18 +201,28 @@ def daily_summary():
 
 # ================= SCHEDULER =================
 
-    # ================= START BOT =================
+scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Jakarta"))
 
-logging.info("🚀 ELITE BOT STARTED")
+# Scan setiap 4 jam (03 menit setelah candle close)
+scheduler.add_job(
+    scan,
+    trigger="interval",minutes=1
 
-import threading
+    
+)
 
-def run_scheduler():
-    while True:
-        scan()
-        time.sleep(60)   # 60 detik untuk test
+# Daily summary jam 21:00 WIB
+scheduler.add_job(
+    daily_summary,
+    trigger="cron",
+    hour=21,
+    minute=0
+)
 
-threading.Thread(target=run_scheduler, daemon=True).start()
+scheduler.start()
+
+logging.info("✅ Scheduler Started (4H + Daily)")
+    
 
 
 # ================= FLASK =================
