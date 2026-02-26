@@ -289,7 +289,6 @@ schedule.every().day.at("18:00").do(post_update)
 schedule.every().day.at("22:00").do(post_update)
 
 schedule.every(60).minutes.do(auto_reply)
-schedule.every(30).minutes.do(smart_engagement)
 
 print("Bot started...")
 
