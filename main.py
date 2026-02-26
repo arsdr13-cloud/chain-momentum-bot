@@ -206,7 +206,9 @@ scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Jakarta"))
 # Scan setiap 4 jam (03 menit setelah candle close)
 scheduler.add_job(
     scan,
-    trigger="interval",minutes=1
+    trigger="cron",
+    hour="*/4",
+    minute=3
 
     
 )
