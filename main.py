@@ -139,59 +139,46 @@ def detect_signal(df):
 # ================= SCAN =================
 
 def scan():
-    global scan_running
-    logging.info("=== SCANNING MARKET ===")
+    logging.info("=== SCANNING MULTI COIN ===")
 
-    for symbol in PAIRS:
-        try:
-            logging.info(f"Scanning {symbol}...")
-            time.sleep(1)
+    coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    full_message = "🚨 MARKET SCAN REPORT 🚨\n"
 
-            df = fetch_data(symbol)
-            if df is None:
-                continue
+    try:
+        for symbol in coins:
+            df = get_market_data(symbol)
 
-            signal = detect_signal(df)
+            price = df["close"].iloc[-1]
+            ema50 = df["ema50"].iloc[-1]
+            ema200 = df["ema200"].iloc[-1]
+            rsi = df["rsi"].iloc[-1]
 
-            if not signal:
-                logging.info(f"No signal for {symbol}")
-                continue
+            signal = "NEUTRAL"
 
-            if last_signal.get(symbol) == signal:
-                continue
+            if ema50 > ema200 and rsi > 50:
+                signal = "BUY 🚀"
+            elif ema50 < ema200 and rsi < 50:
+                signal = "SELL 🔻"
 
-            logging.info(f"Signal detected for {symbol}: {signal}")
+            full_message += f"""
 
-            last = df.iloc[-1]
-            entry = last["close"]
-            atr = last["atr"]
+{symbol.replace('USDT','')}
+Price : ${price:,.2f}
+EMA50 : {ema50:,.2f}
+EMA200: {ema200:,.2f}
+RSI   : {rsi:.2f}
+Signal: {signal}
+"""
 
-            if pd.isna(atr):
-                continue
+        full_message += "\n#Crypto #BTC #ETH #SOL"
 
-            if signal == "BUY":
-                sl = entry - atr
-                tp = entry + (atr * RR_RATIO)
-            else:
-                sl = entry + atr
-                tp = entry - (atr * RR_RATIO)
+        send_telegram(full_message)
+        post_twitter(full_message)
 
-            message = f"""🔥 ELITE {signal} SIGNAL ({TIMEFRAME})
+        logging.info("Multi coin message sent successfully")
 
-Pair: {symbol}
-Entry: {round(entry,4)}
-Stop Loss: {round(sl,4)}
-Take Profit: {round(tp,4)}
-Risk:Reward 1:{RR_RATIO}
-ATR Dynamic SL"""
-
-            send_telegram(message)
-            post_twitter(message)
-
-            last_signal[symbol] = signal
-
-        except Exception as e:
-            logging.error(f"{symbol} scan error: {e}")
+    except Exception as e:
+        logging.error(f"SCAN ERROR: {e}")
 
 
 # ================= SUMMARY =================
@@ -201,30 +188,18 @@ def daily_summary():
 
 # ================= SCHEDULER =================
 
-scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Jakarta"))
+def start_scheduler():
+    scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
 
-# Scan setiap 4 jam (03 menit setelah candle close)
-scheduler.add_job(
-    scan,
-    trigger="cron",
-    hour="*/4",
-    minute=3
+    scheduler.add_job(
+        scan,
+        trigger="cron",
+        hour="*/4",
+        minute=5
+    )
 
-    
-)
-
-# Daily summary jam 21:00 WIB
-scheduler.add_job(
-    daily_summary,
-    trigger="cron",
-    hour=21,
-    minute=0
-)
-
-scheduler.start()
-
-logging.info("✅ Scheduler Started (4H + Daily)")
-    
+    scheduler.start()
+    logging.info("Scheduler Multi Coin Started")
 
 
 # ================= FLASK =================
