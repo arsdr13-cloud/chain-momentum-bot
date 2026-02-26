@@ -185,14 +185,3 @@ def health():
     return "Bot Running (Signal + Report)", 200
 
 start_background()
-
-# ================= START BACKGROUND =================
-def start_background():
-    thread = threading.Thread(target=run_scheduler)
-    thread.daemon = True
-    thread.start()
-    logging.info("Scheduler started")
-
-if __name__ == "__main__":
-    start_background()
-    app.run(host="0.0.0.0", port=8080)
