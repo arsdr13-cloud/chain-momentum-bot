@@ -49,24 +49,16 @@ def send_telegram(text):
 
 def post_twitter(message):
     try:
-        consumer_key = os.getenv("TW_API_KEY")
-        consumer_secret = os.getenv("TW_API_SECRET")
-        access_token = os.getenv("TW_ACCESS_TOKEN")
-        access_secret = os.getenv("TW_ACCESS_SECRET")
-
-        logging.info(f"TW KEY Loaded: {consumer_key is not None}")
-
-        auth = tweepy.OAuth1UserHandler(
-            consumer_key,
-            consumer_secret,
-            access_token,
-            access_secret
+        client = tweepy.Client(
+            consumer_key=os.getenv("TW_API_KEY"),
+            consumer_secret=os.getenv("TW_API_SECRET"),
+            access_token=os.getenv("TW_ACCESS_TOKEN"),
+            access_token_secret=os.getenv("TW_ACCESS_SECRET")
         )
 
-        api = tweepy.API(auth)
-        api.update_status(message)
+        response = client.create_tweet(text=message)
 
-        logging.info("✅ Tweet sent successfully")
+        logging.info(f"✅ Tweet sent: {response.data}")
 
     except Exception as e:
         logging.error(f"❌ Twitter error: {e}")
