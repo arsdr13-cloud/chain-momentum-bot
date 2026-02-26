@@ -48,23 +48,29 @@ def send_telegram(text):
 # ================= TWITTER =================
 
 def post_twitter(text):
+def post_twitter(message):
     try:
-        if not TW_API_KEY:
-            return
+        consumer_key = os.getenv("TW_API_KEY")
+        consumer_secret = os.getenv("TW_API_SECRET")
+        access_token = os.getenv("TW_ACCESS_TOKEN")
+        access_secret = os.getenv("TW_ACCESS_SECRET")
+
+        logging.info(f"TW KEY Loaded: {consumer_key is not None}")
 
         auth = tweepy.OAuth1UserHandler(
-            TW_API_KEY,
-            TW_API_SECRET,
-            TW_ACCESS_TOKEN,
-            TW_ACCESS_SECRET
+            consumer_key,
+            consumer_secret,
+            access_token,
+            access_secret
         )
 
         api = tweepy.API(auth)
-        api.update_status(text[:280])
+        api.update_status(message)
+
+        logging.info("✅ Tweet sent successfully")
 
     except Exception as e:
-        logging.error(f"Twitter error: {e}")
-
+        logging.error(f"❌ Twitter error: {e}")
 # ================= DATA FETCH =================
 
 def fetch_data(symbol):
@@ -191,8 +197,6 @@ ATR Dynamic SL"""
         except Exception as e:
             logging.error(f"{symbol} scan error: {e}")
 
-send_telegram("TEST SIGNAL")
-post_twitter("TEST SIGNAL")
 
 # ================= SUMMARY =================
 
@@ -241,5 +245,8 @@ def start_background():
 # Start background only once
 if os.environ.get("RAILWAY_ENVIRONMENT"):
     start_background()
+    send_telegram("TEST SIGNAL")
+    post_twitter("TEST SIGNAL")
+
 
 
