@@ -205,7 +205,7 @@ def daily_summary():
 logging.info("🚀 ELITE BOT STARTED")
 
 scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
-scheduler.add_job(scan, 'cron', hour='*/4', minute=3)
+scheduler.add_job(scan, 'interval',minute=1)
 scheduler.start()
 
 
