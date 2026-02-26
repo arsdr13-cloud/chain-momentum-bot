@@ -92,49 +92,45 @@ def weekly_report():
 
 def fetch_klines(symbol):
     try:
-        url = "https://api.bybit.com/v5/market/kline"
-
-        # mapping timeframe
-        tf_map = {
-            "1h": "60",
-            "4h": "240",
-            "1d": "D"
+        # mapping symbol ke coingecko id
+        symbol_map = {
+            "BTCUSDT": "bitcoin",
+            "ETHUSDT": "ethereum",
+            "SOLUSDT": "solana",
+            "BNBUSDT": "binancecoin",
+            "XRPUSDT": "ripple",
+            "ADAUSDT": "cardano",
+            "DOGEUSDT": "dogecoin",
+            "AVAXUSDT": "avalanche-2",
+            "DOTUSDT": "polkadot",
+            "LINKUSDT": "chainlink"
         }
 
+        coin_id = symbol_map.get(symbol)
+        if not coin_id:
+            return None
+
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
+
+        # 4H timeframe → gunakan 7 hari data
         params = {
-            "category": "linear",
-            "symbol": symbol,
-            "interval": tf_map.get(TIMEFRAME, "240"),
-            "limit": 300
+            "vs_currency": "usd",
+            "days": 7
         }
 
         r = requests.get(url, params=params)
-
-        if r.status_code != 200:
-            logging.error(f"{symbol} Bybit API error: {r.text}")
-            return None
-
         data = r.json()
 
-        if data["retCode"] != 0:
-            logging.error(f"{symbol} Bybit API error: {data}")
+        if not isinstance(data, list):
+            logging.error(f"{symbol} CoinGecko error: {data}")
             return None
 
-        result = data["result"]["list"]
-
-        if not result:
-            logging.warning(f"{symbol} no data returned")
-            return None
-
-        # Bybit return reversed order → kita balik
-        result.reverse()
-
-        df = pd.DataFrame(result, columns=[
-            "open_time","open","high","low","close","volume","turnover"
+        df = pd.DataFrame(data, columns=[
+            "timestamp", "open", "high", "low", "close"
         ])
 
-        df[["open","high","low","close","volume"]] = \
-            df[["open","high","low","close","volume"]].astype(float)
+        # CoinGecko tidak ada volume → buat dummy volume
+        df["volume"] = 1
 
         return df
 
@@ -145,7 +141,7 @@ def detect_signal(df):
     df["ema50"] = ta.trend.ema_indicator(df["close"], window=50)
     df["ema200"] = ta.trend.ema_indicator(df["close"], window=200)
     df["rsi"] = ta.momentum.rsi(df["close"], window=14)
-    df["vol_ma"] = df["volume"].rolling(20).mean()
+    
 
     last = df.iloc[-1]
     prev = df.iloc[-6:-1]
@@ -156,7 +152,7 @@ def detect_signal(df):
     breakout_up = last["close"] > prev["high"].max()
     breakout_down = last["close"] < prev["low"].min()
 
-    volume_confirm = last["volume"] > last["vol_ma"]
+    volume_confirm = True
 
     rsi_buy = 35 < last["rsi"] < 55
     rsi_sell = 45 < last["rsi"] < 65
