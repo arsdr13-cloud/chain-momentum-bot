@@ -168,7 +168,11 @@ if not scheduler.running:
 # ================= FLASK =================
 
 app = Flask(__name__)
-
+@app.before_first_request
+def activate_scheduler():
+    if not scheduler.running:
+        start_scheduler()
+        logging.info("Scheduler activated")
 @app.route("/")
 def home():
     return "ELITE BOT RUNNING", 200
