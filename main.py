@@ -83,19 +83,19 @@ def post_to_twitter(text):
     try:
         import tweepy
 
-        auth = tweepy.OAuth1UserHandler(
-            TWITTER_API_KEY,
-            TWITTER_API_SECRET,
-            TWITTER_ACCESS_TOKEN,
-            TWITTER_ACCESS_SECRET
+        client = tweepy.Client(
+            consumer_key=TWITTER_API_KEY,
+            consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN,
+            access_token_secret=TWITTER_ACCESS_SECRET
         )
 
-        api = tweepy.API(auth)
-        api.update_status(text)
-        logging.info("Tweet posted successfully")
+        response = client.create_tweet(text=text)
+
+        logging.info(f"Tweet posted: {response.data}")
 
     except Exception as e:
-        logging.error(f"Twitter error: {e}")
+        logging.error(f"Twitter v2 error: {e}")
 
 
 # ==============================
