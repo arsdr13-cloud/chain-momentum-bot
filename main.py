@@ -3,7 +3,6 @@ import time
 import logging
 import threading
 import requests
-import schedule
 import pandas as pd
 from flask import Flask
 import tweepy
@@ -142,7 +141,7 @@ def detect_signal(df):
 # ================= SCAN =================
 
 def scan():
-    logging.info("Scanning market...")
+    logging.info("=== SCANNING MARKET ===")
 
     for symbol in PAIRS:
         try:
@@ -154,12 +153,15 @@ def scan():
                 continue
 
             signal = detect_signal(df)
-            logging.info(f"No signal for {symbol}")
+
+            if not signal:
+                logging.info(f"No signal for {symbol}")
                 continue
 
             if last_signal.get(symbol) == signal:
-                logging.info(f"Signal detected for {symbol}: {signal}")
                 continue
+
+            logging.info(f"Signal detected for {symbol}: {signal}")
 
             last = df.iloc[-1]
             entry = last["close"]
@@ -210,9 +212,11 @@ if __name__ == "__main__":
 
     scheduler.start()
 
-    while True:
-        time.sleep(60)
+    scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
+    scheduler.add_job(scan, 'cron', hour='*/4', minute=3)
+    scheduler.start()
 
+    logging.info("🚀 ELITE BOT STARTED")
 # ================= FLASK =================
 
 app = Flask(__name__)
@@ -222,25 +226,6 @@ def home():
     return "ELITE BOT RUNNING", 200
 
 
-
-# ================= START BACKGROUND SAFELY =================
-
-def start_background():
-    def safe_runner():
-        try:
-            run_scheduler()
-        except Exception as e:
-            logging.error(f"Scheduler crashed: {e}")
-
-    thread = threading.Thread(target=safe_runner)
-    thread.daemon = True
-    thread.start()
-
-    logging.info("Scheduler started")
-
-# Start background only once
-if os.environ.get("RAILWAY_ENVIRONMENT"):
-    start_background()
     send_telegram("TEST SIGNAL")
     post_twitter("TEST SIGNAL")
 
