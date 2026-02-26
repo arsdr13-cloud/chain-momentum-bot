@@ -238,3 +238,6 @@ def start_background():
 # Start background only once
 if os.environ.get("RAILWAY_ENVIRONMENT"):
     start_background()
+
+send_telegram("TEST SIGNAL")
+post_twitter("TEST SIGNAL")
