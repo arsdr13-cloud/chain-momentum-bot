@@ -1,9 +1,5 @@
 flask
+pandas
 requests
 schedule
-matplotlib
-tweepy>=4.14.0
-gunicorn
-pandas
-ta
-numpy
+tweepy
