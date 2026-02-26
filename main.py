@@ -138,7 +138,6 @@ def detect_signal(df):
 
 # ================= SCAN =================
 
-
 def scan():
     logging.info("=== SCANNING MULTI COIN ===")
 
