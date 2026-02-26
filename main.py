@@ -154,6 +154,8 @@ def weekly_report():
     send_telegram_message(message)
     post_to_twitter(message)
 
+send_telegram_message("✅ BOT ONLINE")
+post_to_twitter("✅ BOT ONLINE")
 
 # ==============================
 # SCHEDULER
