@@ -139,6 +139,7 @@ def detect_signal(df):
 # ================= SCAN =================
 
 def scan():
+def scan():
     logging.info("=== SCANNING MULTI COIN ===")
 
     coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
@@ -146,7 +147,11 @@ def scan():
 
     try:
         for symbol in coins:
-            df = get_market_data(symbol)
+            df = fetch_data(symbol)
+
+            if df is None or len(df) < 210:
+                logging.warning(f"{symbol} data not ready")
+                continue
 
             price = df["close"].iloc[-1]
             ema50 = df["ema50"].iloc[-1]
@@ -188,9 +193,11 @@ def daily_summary():
 
 # ================= SCHEDULER =================
 
-def start_scheduler():
-    scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
+from apscheduler.schedulers.background import BackgroundScheduler
 
+scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
+
+def start_scheduler():
     scheduler.add_job(
         scan,
         trigger="cron",
@@ -211,7 +218,7 @@ def home():
     return "ELITE BOT RUNNING", 200
 
 
-    
-
-
-
+# ================== MAIN ==================
+if __name__ == "__main__":
+    start_scheduler()   # ✅ PANGGIL DI SINI
+    app.run(host="0.0.0.0", port=8080)
