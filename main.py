@@ -89,57 +89,58 @@ def weekly_report():
     post_twitter(msg)
 
 # ================= SIGNAL ENGINE =================
+
 def fetch_klines(symbol):
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol, "interval": TIMEFRAME, "limit": 300}
-    r = requests.get(url, params=params)
+    try:
+        url = "https://api.bybit.com/v5/market/kline"
 
-    if r.status_code != 200:
-        logging.error(f"{symbol} API error: {r.text}")
+        # mapping timeframe
+        tf_map = {
+            "1h": "60",
+            "4h": "240",
+            "1d": "D"
+        }
+
+        params = {
+            "category": "linear",
+            "symbol": symbol,
+            "interval": tf_map.get(TIMEFRAME, "240"),
+            "limit": 300
+        }
+
+        r = requests.get(url, params=params)
+
+        if r.status_code != 200:
+            logging.error(f"{symbol} Bybit API error: {r.text}")
+            return None
+
+        data = r.json()
+
+        if data["retCode"] != 0:
+            logging.error(f"{symbol} Bybit API error: {data}")
+            return None
+
+        result = data["result"]["list"]
+
+        if not result:
+            logging.warning(f"{symbol} no data returned")
+            return None
+
+        # Bybit return reversed order → kita balik
+        result.reverse()
+
+        df = pd.DataFrame(result, columns=[
+            "open_time","open","high","low","close","volume","turnover"
+        ])
+
+        df[["open","high","low","close","volume"]] = \
+            df[["open","high","low","close","volume"]].astype(float)
+
+        return df
+
+    except Exception as e:
+        logging.error(f"{symbol} fetch error: {e}")
         return None
-
-    data = r.json()
-
-    if not data or len(data) < 210:
-        logging.warning(f"{symbol} not enough data")
-        return None
-
-    df = pd.DataFrame(data, columns=[
-        "open_time","open","high","low","close","volume",
-        "close_time","qav","trades","tbbav","tbqav","ignore"
-    ])
-
-    df[["open","high","low","close","volume"]] = \
-        df[["open","high","low","close","volume"]].astype(float)
-
-    return df
-
-def detect_signal(df):
-    df["ema50"] = ta.trend.ema_indicator(df["close"], window=50)
-    df["ema200"] = ta.trend.ema_indicator(df["close"], window=200)
-    df["rsi"] = ta.momentum.rsi(df["close"], window=14)
-    df["vol_ma"] = df["volume"].rolling(20).mean()
-
-    last = df.iloc[-1]
-    prev = df.iloc[-2]
-
-    if (
-        last["ema50"] > last["ema200"] and
-        35 <= last["rsi"] <= 50 and
-        last["close"] > prev["high"] and
-        last["volume"] > last["vol_ma"]
-    ):
-        return "LONG"
-
-    if (
-        last["ema50"] < last["ema200"] and
-        50 <= last["rsi"] <= 65 and
-        last["close"] < prev["low"] and
-        last["volume"] > last["vol_ma"]
-    ):
-        return "SHORT"
-
-    return None
 
 def scan_market():
     logging.info("Scanning signals...")
