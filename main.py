@@ -306,8 +306,21 @@ def run_web():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-threading.Thread(target=run_web).start()
+# ==============================
+# RUN SCHEDULER IN BACKGROUND
+# ==============================
 
-while True:
-    schedule.run_pending()
-    time.sleep(30)
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
+
+threading.Thread(target=run_scheduler, daemon=True).start()
+
+# ==============================
+# RUN FLASK (MAIN PROCESS)
+# ==============================
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
