@@ -7,7 +7,9 @@ import schedule
 import pandas as pd
 from flask import Flask
 import tweepy
-
+from apscheduler.schedulers.background 
+import BackgroundScheduler
+import pytz
 # ================= CONFIG =================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -144,6 +146,7 @@ def scan():
 
     for symbol in PAIRS:
         try:
+            logging.info(f"Scanning {symbol}...")
             time.sleep(1)
 
             df = fetch_data(symbol)
@@ -151,10 +154,11 @@ def scan():
                 continue
 
             signal = detect_signal(df)
-            if not signal:
+            logging.info(f"No signal for {symbol}")
                 continue
 
             if last_signal.get(symbol) == signal:
+                logging.info(f"Signal detected for {symbol}: {signal}")
                 continue
 
             last = df.iloc[-1]
@@ -196,17 +200,18 @@ def daily_summary():
 
 # ================= SCHEDULER =================
 
-def run_scheduler():
-    schedule.every(SCAN_INTERVAL).minutes.do(scan)
-    schedule.every().day.at("23:00").do(daily_summary)
+if __name__ == "__main__":
+    logging.info("🚀 ELITE BOT STARTED")
+
+    scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
+
+    # Scan tiap 4 jam (untuk timeframe 4H)
+    scheduler.add_job(scan, 'cron', hour='*/4', minute=3)
+
+    scheduler.start()
 
     while True:
-        try:
-            schedule.run_pending()
-            time.sleep(5)
-        except Exception as e:
-            logging.error(f"Scheduler error: {e}")
-            time.sleep(5)
+        time.sleep(60)
 
 # ================= FLASK =================
 
