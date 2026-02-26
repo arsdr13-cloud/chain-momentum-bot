@@ -218,22 +218,7 @@ app = Flask(__name__)
 def home():
     return "ELITE BOT RUNNING", 200
 
-# ================= START BACKGROUND =================
 
-def start_background():
-    try:
-        thread = threading.Thread(target=run_scheduler)
-        thread.daemon = True
-        thread.start()
-
-        logging.info("Scheduler started")
-
-        if BOT_TOKEN and CHAT_ID:
-            send_telegram("🚀 ELITE Crypto Signal Bot ACTIVE")
-
-    except Exception as e:
-        logging.error(f"Startup error: {e}")
-    
 
 # ================= START BACKGROUND SAFELY =================
 
