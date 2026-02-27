@@ -62,8 +62,12 @@ def post_twitter_with_image(message, image_path):
             access_token_secret=TW_ACCESS_SECRET
         )
 
-        client.create_tweet(text=message[:250], media_ids=[media.media_id])
-        logging.info("Tweet sent")
+        response = client.create_tweet(
+            text=message,
+            media_ids=[media.media_id]
+        )
+
+        logging.info(f"Tweet sent successfully: {response}")
 
     except Exception as e:
         logging.error(f"Twitter error: {e}")
@@ -209,11 +213,34 @@ def scan():
     if not data:
         return
 
-    message = build_premium_message(data)
+    # ================= TELEGRAM VERSION (FULL PREMIUM) =================
+    telegram_message = build_premium_message(data)
+
+    # ================= TWITTER VERSION (SHORT & CLEAN) =================
+    btc_price = data["BTC"]["quote"]["USD"]["price"]
+    btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
+
+    eth_price = data["ETH"]["quote"]["USD"]["price"]
+    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
+
+    sol_price = data["SOL"]["quote"]["USD"]["price"]
+    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
+
+    twitter_message = (
+        f"🚀 CHAIN MOMENTUM UPDATE\n\n"
+        f"BTC ${btc_price:,.0f} ({btc_change:.2f}%)\n"
+        f"ETH ${eth_price:,.0f} ({eth_change:.2f}%)\n"
+        f"SOL ${sol_price:,.0f} ({sol_change:.2f}%)\n\n"
+        f"#Crypto #BTC #ETH #SOL"
+    )
+
     image_path = generate_price_chart(data)
 
-    send_telegram_photo(image_path, message)
-    post_twitter_with_image(message, image_path)
+    # ================= SEND TELEGRAM =================
+    send_telegram_photo(image_path, telegram_message)
+
+    # ================= SEND TWITTER (ERROR SAFE) =================
+    post_twitter_with_image(twitter_message, image_path)
 
 # ================= ROUTES =================
 
