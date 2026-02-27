@@ -2,9 +2,11 @@ import os
 import logging
 import requests
 import pandas as pd
+import matplotlib.pyplot as plt
 from flask import Flask
 import tweepy
 from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
 
 # ================= CONFIG =================
 
@@ -28,27 +30,30 @@ logging.basicConfig(level=logging.INFO)
 
 # ================= TELEGRAM =================
 
-def send_telegram(text):
+def send_telegram_photo(photo_path, caption):
     try:
-        if not BOT_TOKEN or not CHAT_ID:
-            return
-
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-
-        requests.post(
-            url,
-            json={"chat_id": CHAT_ID, "text": text},
-            timeout=10
-        )
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+        with open(photo_path, "rb") as img:
+            requests.post(
+                url,
+                data={"chat_id": CHAT_ID, "caption": caption},
+                files={"photo": img}
+            )
     except Exception as e:
         logging.error(f"Telegram error: {e}")
 
 # ================= TWITTER =================
 
-def post_twitter(message):
+def post_twitter_with_image(message, image_path):
     try:
-        if not TW_API_KEY:
-            return
+        auth = tweepy.OAuth1UserHandler(
+            TW_API_KEY,
+            TW_API_SECRET,
+            TW_ACCESS_TOKEN,
+            TW_ACCESS_SECRET
+        )
+        api = tweepy.API(auth)
+        media = api.media_upload(image_path)
 
         client = tweepy.Client(
             consumer_key=TW_API_KEY,
@@ -57,8 +62,8 @@ def post_twitter(message):
             access_token_secret=TW_ACCESS_SECRET
         )
 
-        client.create_tweet(text=message)
-        logging.info("Tweet sent")
+        client.create_tweet(text=message, media_ids=[media.media_id])
+        logging.info("Tweet with image sent")
 
     except Exception as e:
         logging.error(f"Twitter error: {e}")
@@ -68,9 +73,6 @@ def post_twitter(message):
 def fetch_data(symbol):
     try:
         coin = COINGECKO_IDS.get(symbol)
-        if not coin:
-            return None
-
         url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
 
         params = {
@@ -80,12 +82,7 @@ def fetch_data(symbol):
         }
 
         r = requests.get(url, params=params, timeout=15)
-        if r.status_code != 200:
-            return None
-
         data = r.json().get("prices")
-        if not data:
-            return None
 
         df = pd.DataFrame(data, columns=["timestamp", "close"])
         df["close"] = df["close"].astype(float)
@@ -93,62 +90,77 @@ def fetch_data(symbol):
         df["ema50"] = df["close"].ewm(span=50).mean()
         df["ema200"] = df["close"].ewm(span=200).mean()
 
-        delta = df["close"].diff()
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
-        rs = gain.rolling(14).mean() / loss.rolling(14).mean()
-        df["rsi"] = 100 - (100 / (1 + rs))
-
         return df
 
-    except Exception as e:
-        logging.error(f"{symbol} fetch error: {e}")
+    except:
         return None
+
+# ================= CHART GENERATOR =================
+
+def generate_combined_chart(data_dict):
+    plt.style.use("dark_background")
+    fig, axes = plt.subplots(3, 1, figsize=(10, 12))
+
+    fig.suptitle("CHAIN MOMENTUM MARKET REPORT", fontsize=16, fontweight="bold")
+
+    for ax, (symbol, df) in zip(axes, data_dict.items()):
+
+        ax.plot(df["close"], label="Price")
+        ax.plot(df["ema50"], linestyle="--", label="EMA50")
+        ax.plot(df["ema200"], linestyle="--", label="EMA200")
+
+        ax.set_title(symbol.replace("USDT",""))
+        ax.legend()
+
+    # Watermark
+    fig.text(0.5, 0.02,
+             "© Chain Momentum | Crypto Market Intelligence",
+             ha="center",
+             fontsize=10,
+             alpha=0.6)
+
+    filename = "market_report.png"
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
+
+    return filename
 
 # ================= SCAN =================
 
 def scan():
-    print("🔥 SCAN FUNCTION TRIGGERED 🔥")
-    logging.info("=== SCANNING MULTI COIN ===")
+    logging.info("=== PRO MARKET SCAN ===")
 
     message = "🚨 MARKET SCAN REPORT 🚨\n\n"
+    data_dict = {}
 
     for symbol in PAIRS:
-
         df = fetch_data(symbol)
-
-        if df is None or len(df) < 210:
-            message += f"{symbol.replace('USDT','')} → Data Error ❌\n"
+        if df is None or len(df) < 50:
             continue
+
+        data_dict[symbol] = df
 
         price = df["close"].iloc[-1]
         ema50 = df["ema50"].iloc[-1]
         ema200 = df["ema200"].iloc[-1]
-        rsi = df["rsi"].iloc[-1]
 
-        # ===== STATUS LOGIC =====
-        if ema50 > ema200 and rsi > 55:
+        if ema50 > ema200:
             status = "Bullish 🚀"
-        elif ema50 < ema200 and rsi < 45:
+        elif ema50 < ema200:
             status = "Bearish 🔻"
         else:
             status = "Neutral ⚖️"
 
-        message += (
-            f"{symbol.replace('USDT','')}\n"
-            f"Price : ${price:,.2f}\n"
-            f"RSI   : {rsi:.2f}\n"
-            f"Status: {status}\n\n"
-        )
+        message += f"{symbol.replace('USDT','')} → ${price:,.2f} | {status}\n"
 
-    message += "#Crypto #BTC #ETH #SOL"
+    message += "\n#Crypto #BTC #ETH #SOL"
 
-    send_telegram(message)
-    post_twitter(message)
+    if data_dict:
+        image_path = generate_combined_chart(data_dict)
+        send_telegram_photo(image_path, message)
+        post_twitter_with_image(message, image_path)
 
-    logging.info("Market scan sent successfully")
-
-# ================= SCHEDULER =================
 # ================= FLASK =================
 
 app = Flask(__name__)
@@ -159,7 +171,7 @@ scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
 
 def start_scheduler():
     if scheduler.get_jobs():
-        return  # cegah dobel
+        return
 
     scheduler.add_job(
         scan,
@@ -171,14 +183,11 @@ def start_scheduler():
     scheduler.start()
     logging.info("Scheduler Started")
 
-# START SEKALI SAJA
 start_scheduler()
 
 @app.route("/")
 def home():
-    return "ELITE BOT RUNNING", 200
-
-# ================= MAIN =================
+    return "CHAIN MOMENTUM PRO BOT RUNNING", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
