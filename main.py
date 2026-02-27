@@ -125,6 +125,7 @@ def fetch_latest_news():
     except Exception as e:
         logging.error(f"News error: {e}")
         return ""
+logging.info(f"News response: {r.text[:500]}")
 
 # ================= CHART =================
 
