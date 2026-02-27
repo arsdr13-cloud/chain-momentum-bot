@@ -193,11 +193,10 @@ def scan():
 
         message += f"{symbol.replace('USDT','')} → ${price:,.2f} | {status}\n"
 
-    # Tambah berita terbaru
-news_section = fetch_latest_news()
-
-message += news_section
-message += "\n#Crypto #BTC #ETH #SOL"
+    # Tambah berita terbaru (HARUS DI DALAM FUNCTION)
+    news_section = fetch_latest_news()
+    message += news_section
+    message += "\n#Crypto #BTC #ETH #SOL"
 
     if data_dict:
         image_path = generate_combined_chart(data_dict)
