@@ -20,11 +20,6 @@ TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
 
 PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 
-COINGECKO_IDS = {
-    "BTCUSDT": "bitcoin",
-    "ETHUSDT": "ethereum",
-    "SOLUSDT": "solana"
-}
 
 logging.basicConfig(level=logging.INFO)
 
