@@ -211,49 +211,34 @@ def scan():
 
     data = fetch_market_data()
     if not data:
+        logging.error("No market data")
         return
 
-    # ================= TELEGRAM VERSION (FULL PREMIUM) =================
+    logging.info("Building messages...")
+
     telegram_message = build_premium_message(data)
 
-    # ================= TWITTER VERSION (SHORT & CLEAN) =================
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
 
-    eth_price = data["ETH"]["quote"]["USD"]["price"]
-    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
-
-    sol_price = data["SOL"]["quote"]["USD"]["price"]
-    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
-
     twitter_message = (
-        f"🚀 CHAIN MOMENTUM UPDATE\n\n"
         f"BTC ${btc_price:,.0f} ({btc_change:.2f}%)\n"
-        f"ETH ${eth_price:,.0f} ({eth_change:.2f}%)\n"
-        f"SOL ${sol_price:,.0f} ({sol_change:.2f}%)\n\n"
-        f"#Crypto #BTC #ETH #SOL"
+        "#Crypto #BTC #ETH #SOL"
     )
 
     image_path = generate_price_chart(data)
 
-    # ================= SEND TELEGRAM =================
+    logging.info("Sending Telegram...")
     send_telegram_photo(image_path, telegram_message)
 
-    # ================= SEND TWITTER (ERROR SAFE) =================
+    logging.info("Sending Twitter...")
     post_twitter_with_image(twitter_message, image_path)
 
-# ================= ROUTES =================
+    logging.info("SCAN FINISHED")
 
-@app.route("/")
-def home():
-    return "CHAIN MOMENTUM BOT ACTIVE", 200
 
-@app.route("/run-scan")
-def run_scan():
-    scan()
-    return "SCAN EXECUTED", 200
-
-# ================= START =================
+   
+  # ================= START =================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
