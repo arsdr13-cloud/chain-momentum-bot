@@ -99,28 +99,25 @@ def fetch_market_data():
 
 def fetch_latest_news():
     try:
-        rss_url = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+        rss_url = "https://cryptocompare.com/api/data/v2/news/?lang=EN"
         r = requests.get(rss_url, timeout=20)
 
         if r.status_code != 200:
             return ""
 
-        root = ET.fromstring(r.content)
+        data = r.json()
 
         news_text = "\n📰 MARKET HEADLINES\n"
         news_text += "──────────────────\n"
 
-        count = 0
-        for item in root.iter("item"):
-            title = item.find("title").text
+        for article in data["Data"][:3]:
+            title = article["title"]
             news_text += f"• {title}\n"
-            count += 1
-            if count >= 3:
-                break
 
         return news_text
 
-    except:
+    except Exception as e:
+        logging.error(f"News error: {e}")
         return ""
 
 # ================= CHART =================
