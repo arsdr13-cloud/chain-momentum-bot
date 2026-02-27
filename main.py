@@ -69,7 +69,7 @@ def post_twitter_with_image(message, image_path):
 
 def fetch_data(symbol):
     try:
-        url = "https://api1.binance.com/api/v3/klines"
+        url = "https://data-api.binance.vision/api/v3/klines"
         params = {
             "symbol": symbol,
             "interval": "1d",
@@ -100,7 +100,7 @@ def fetch_latest_news():
         if not CRYPTO_PANIC_API:
             return ""
 
-        url = "https://cryptopanic.com/api/v1/posts/"
+        url = "https://CRYPTO_PANIC_API/api/v1/posts/"
         params = {
             "auth_token": CRYPTO_PANIC_API,
             "currencies": "BTC,ETH,SOL",
