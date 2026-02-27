@@ -67,31 +67,38 @@ def post_twitter_with_image(message, image_path):
 
 # ================= DATA FETCH =================
 
-def fetch_data(symbol):
-    try:
-        url = "https://data-api.binance.vision/api/v3/klines"
-        params = {
-            "symbol": symbol,
-            "interval": "1d",
-            "limit": 120
-        }
+import requests
+import pandas as pd
 
-        r = requests.get(url, params=params, timeout=20)
+def fetch_data(symbol="BTCUSDT", interval="1h", limit=100):
+    url = "https://data-api.binance.vision/api/v3/klines"
 
-        if r.status_code != 200:
-            logging.error(f"{symbol} Binance error: {r.status_code}")
-            return None
+    params = {
+        "symbol": symbol,
+        "interval": interval,
+        "limit": limit
+    }
 
-        df = pd.DataFrame(r.json())
-        df["close"] = df[4].astype(float)
-        df["ema50"] = df["close"].ewm(span=50).mean()
-        df["ema200"] = df["close"].ewm(span=200).mean()
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
 
-        return df
+    response = requests.get(url, params=params, headers=headers, timeout=10)
 
-    except Exception as e:
-        logging.error(f"{symbol} fetch error: {e}")
+    if response.status_code != 200:
+        print(f"{symbol} Binance error: {response.status_code}")
         return None
+
+    data = response.json()
+
+    df = pd.DataFrame(data, columns=[
+        "timestamp","open","high","low","close","volume",
+        "close_time","qav","num_trades",
+        "taker_base_vol","taker_quote_vol","ignore"
+    ])
+
+    df["close"] = df["close"].astype(float)
+    return df
 
 # ================= NEWS FETCH =================
 
