@@ -155,8 +155,9 @@ scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
 def start_scheduler():
     scheduler.add_job(
         scan,
-        trigger="interval",
-minutes=1
+        trigger="cron",
+    hour="*/4",
+    minute=5
     )
     scheduler.start()
     logging.info("Scheduler Started")
