@@ -114,7 +114,7 @@ def fetch_latest_news():
             return ""
 
         news_text = "\n📰 MARKET HEADLINES\n"
-        news_text += "──────────────────\n"
+        news_text += "──────────────── \n"
  
         for article in data["Data"][:3]:
             title = article.get("title", "")
