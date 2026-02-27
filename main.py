@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from flask import Flask
 import tweepy
 import xml.etree.ElementTree as ET
+from datetime import datetime
 
 # ================= CONFIG =================
 
@@ -32,7 +33,7 @@ def send_telegram_photo(photo_path, caption):
                 url,
                 data={
                     "chat_id": CHAT_ID,
-                    "caption": caption[:1024]  # limit telegram caption
+                    "caption": caption[:1024]
                 },
                 files={"photo": img},
                 timeout=20
@@ -94,7 +95,7 @@ def fetch_market_data():
         logging.error(f"CMC fetch error: {e}")
         return None
 
-# ================= RSS NEWS (BTC ETH SOL) =================
+# ================= RSS NEWS =================
 
 def fetch_latest_news():
     try:
@@ -102,26 +103,24 @@ def fetch_latest_news():
         r = requests.get(rss_url, timeout=20)
 
         if r.status_code != 200:
-            logging.error("RSS fetch failed")
             return ""
 
         root = ET.fromstring(r.content)
 
-        news_text = "\n📰 TOP CRYPTO NEWS:\n"
-        count = 0
+        news_text = "\n📰 MARKET HEADLINES\n"
+        news_text += "──────────────────\n"
 
+        count = 0
         for item in root.iter("item"):
             title = item.find("title").text
             news_text += f"• {title}\n"
             count += 1
-
             if count >= 3:
                 break
 
         return news_text
 
-    except Exception as e:
-        logging.error(f"RSS error: {e}")
+    except:
         return ""
 
 # ================= CHART =================
@@ -139,8 +138,7 @@ def generate_price_chart(data):
 
     plt.figure(figsize=(8, 5))
     plt.bar(coins, prices)
-
-    plt.title("CHAIN MOMENTUM MARKET REPORT")
+    plt.title("CHAIN MOMENTUM – MARKET SNAPSHOT")
     plt.ylabel("Price (USD)")
     plt.tight_layout()
 
@@ -149,6 +147,53 @@ def generate_price_chart(data):
     plt.close()
 
     return filename
+
+# ================= PREMIUM FORMAT =================
+
+def build_premium_message(data):
+
+    now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
+
+    message = "━━━━━━━━━━━━━━━━━━━━━━\n"
+    message += "🚀  CHAIN MOMENTUM\n"
+    message += "📊  Premium Crypto Intelligence\n"
+    message += f"🕒  {now}\n"
+    message += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+    total_bullish = 0
+
+    for coin in COINS:
+        price = data[coin]["quote"]["USD"]["price"]
+        change_24h = data[coin]["quote"]["USD"]["percent_change_24h"]
+        volume = data[coin]["quote"]["USD"]["volume_24h"]
+
+        status = "🟢 Bullish Momentum" if change_24h > 0 else "🔴 Bearish Pressure"
+
+        if change_24h > 0:
+            total_bullish += 1
+
+        message += f"💎 {coin}\n"
+        message += f"   💰 Price      : ${price:,.2f}\n"
+        message += f"   📊 24H Change : {change_24h:.2f}%\n"
+        message += f"   💵 Volume     : ${volume:,.0f}\n"
+        message += f"   🔎 Sentiment  : {status}\n\n"
+
+    # Market Summary
+    message += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    message += "🧠 MARKET SUMMARY\n"
+
+    if total_bullish >= 2:
+        message += "Overall Bias: 🟢 Bullish Control\n"
+    else:
+        message += "Overall Bias: 🔴 Defensive Mode\n"
+
+    message += fetch_latest_news()
+
+    message += "\n━━━━━━━━━━━━━━━━━━━━━━\n"
+    message += "#Crypto #BTC #ETH #SOL\n"
+    message += "Stay Ahead. Trade Smart."
+
+    return message
 
 # ================= SCAN =================
 
@@ -159,25 +204,7 @@ def scan():
     if not data:
         return
 
-    message = "━━━━━━━━━━━━━━━━━━\n"
-    message += "🚀 CHAIN MOMENTUM\n"
-    message += "📊 Premium Market Report\n"
-    message += "━━━━━━━━━━━━━━━━━━\n\n"
-
-    for coin in COINS:
-        price = data[coin]["quote"]["USD"]["price"]
-        change_24h = data[coin]["quote"]["USD"]["percent_change_24h"]
-
-        status = "🟢 Bullish" if change_24h > 0 else "🔴 Bearish"
-
-        message += f"💎 {coin}\n"
-        message += f"💰 Price: ${price:,.2f}\n"
-        message += f"📊 24H: {change_24h:.2f}% | {status}\n\n"
-
-    message += fetch_latest_news()
-    message += "\n━━━━━━━━━━━━━━━━━━\n"
-    message += "#Crypto #BTC #ETH #SOL"
-
+    message = build_premium_message(data)
     image_path = generate_price_chart(data)
 
     send_telegram_photo(image_path, message)
