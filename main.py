@@ -107,21 +107,18 @@ def fetch_latest_news():
 
         root = ET.fromstring(r.content)
 
-        news_text = "\n📰 LATEST BTC • ETH • SOL NEWS:\n"
-
+        news_text = "\n📰 TOP CRYPTO NEWS:\n"
         count = 0
 
         for item in root.iter("item"):
-            title = item.find("title").text.upper()
-
-            if any(keyword in title for keyword in COINS):
-                news_text += f"• {item.find('title').text}\n"
-                count += 1
+            title = item.find("title").text
+            news_text += f"• {title}\n"
+            count += 1
 
             if count >= 3:
                 break
 
-        return news_text if count > 0 else ""
+        return news_text
 
     except Exception as e:
         logging.error(f"RSS error: {e}")
