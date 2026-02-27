@@ -72,47 +72,53 @@ def post_twitter_with_image(message, image_path):
 
 def fetch_data(symbol):
     try:
-        coin = COINGECKO_IDS.get(symbol)
-        url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
-
+        url = "https://api.binance.com/api/v3/klines"
         params = {
-            "vs_currency": "usd",
-            "days": "120",
-            "interval": "daily"
+            "symbol": symbol,
+            "interval": "1d",
+            "limit": 120
         }
 
         r = requests.get(url, params=params, timeout=15)
-        data = r.json().get("prices")
 
-        df = pd.DataFrame(data, columns=["timestamp", "close"])
-        df["close"] = df["close"].astype(float)
+        if r.status_code != 200:
+            logging.error(f"{symbol} Binance error: {r.status_code}")
+            return None
+
+        data = r.json()
+
+        df = pd.DataFrame(data)
+        df["close"] = df[4].astype(float)
 
         df["ema50"] = df["close"].ewm(span=50).mean()
         df["ema200"] = df["close"].ewm(span=200).mean()
 
         return df
 
-    except:
+    except Exception as e:
+        logging.error(f"{symbol} error: {e}")
         return None
 
 # ================= CHART GENERATOR =================
 
 def generate_combined_chart(data_dict):
     plt.style.use("dark_background")
-    fig, axes = plt.subplots(3, 1, figsize=(10, 12))
+
+    rows = len(data_dict)
+    fig, axes = plt.subplots(rows, 1, figsize=(10, 4*rows))
+
+    if rows == 1:
+        axes = [axes]
 
     fig.suptitle("CHAIN MOMENTUM MARKET REPORT", fontsize=16, fontweight="bold")
 
     for ax, (symbol, df) in zip(axes, data_dict.items()):
-
         ax.plot(df["close"], label="Price")
         ax.plot(df["ema50"], linestyle="--", label="EMA50")
         ax.plot(df["ema200"], linestyle="--", label="EMA200")
-
         ax.set_title(symbol.replace("USDT",""))
         ax.legend()
 
-    # Watermark
     fig.text(0.5, 0.02,
              "© Chain Momentum | Crypto Market Intelligence",
              ha="center",
