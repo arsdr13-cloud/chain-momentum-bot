@@ -10,7 +10,7 @@ import tweepy
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 CMC_API_KEY = os.getenv("CMC_API_KEY")
-
+CRYPTO_PANIC_API = os.gatenv("CRYPTO_PANIC_API") 
 TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
@@ -91,6 +91,46 @@ def fetch_market_data():
         logging.error(f"CMC fetch error: {e}")
         return None
 
+# ================= CRYPTOPANIC =================
+
+CRYPTO_PANIC_API = os.getenv("CRYPTO_PANIC_API")
+
+def fetch_latest_news():
+    try:
+        if not CRYPTO_PANIC_API:
+            logging.warning("No CryptoPanic API key")
+            return ""
+
+        url = "https://cryptopanic.com/api/v1/posts/"
+        params = {
+            "auth_token": CRYPTO_PANIC_API,
+            "currencies": "BTC,ETH,SOL",
+            "kind": "news",
+            "public": "true"
+        }
+
+        r = requests.get(url, params=params, timeout=20)
+
+        if r.status_code != 200:
+            logging.error(f"News API error: {r.status_code}")
+            return ""
+
+        results = r.json().get("results", [])[:3]
+
+        if not results:
+            return ""
+
+        news_text = "\n📰 LATEST CRYPTO NEWS:\n"
+        for item in results:
+            news_text += f"• {item['title']}\n"
+
+        return news_text
+
+    except Exception as e:
+        logging.error(f"News fetch error: {e}")
+        return ""
+
+
 # ================= CHART =================
 
 def generate_price_chart(data):
@@ -137,7 +177,10 @@ def scan():
         message += f"{coin} → ${price:,.2f}\n"
         message += f"24h Change: {change_24h:.2f}% | {status}\n\n"
 
-    message += "#Crypto #BTC #ETH #SOL"
+    # 🔥 Tambahkan berita di sini
+    message += fetch_latest_news()
+
+    message += "\n#Crypto #BTC #ETH #SOL"
 
     image_path = generate_price_chart(data)
 
