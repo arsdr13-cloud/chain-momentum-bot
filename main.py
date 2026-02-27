@@ -4,13 +4,13 @@ import requests
 import matplotlib.pyplot as plt
 from flask import Flask
 import tweepy
+import xml.etree.ElementTree as ET
 
 # ================= CONFIG =================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 CMC_API_KEY = os.getenv("CMC_API_KEY")
-CRYPTO_PANIC_API = os.getenv("CRYPTO_PANIC_API")
 
 TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
@@ -30,7 +30,10 @@ def send_telegram_photo(photo_path, caption):
         with open(photo_path, "rb") as img:
             requests.post(
                 url,
-                data={"chat_id": CHAT_ID, "caption": caption},
+                data={
+                    "chat_id": CHAT_ID,
+                    "caption": caption[:1024]  # limit telegram caption
+                },
                 files={"photo": img},
                 timeout=20
             )
@@ -58,7 +61,7 @@ def post_twitter_with_image(message, image_path):
             access_token_secret=TW_ACCESS_SECRET
         )
 
-        client.create_tweet(text=message, media_ids=[media.media_id])
+        client.create_tweet(text=message[:250], media_ids=[media.media_id])
         logging.info("Tweet sent")
 
     except Exception as e:
@@ -91,41 +94,37 @@ def fetch_market_data():
         logging.error(f"CMC fetch error: {e}")
         return None
 
-# ================= CRYPTOPANIC =================
+# ================= RSS NEWS (BTC ETH SOL) =================
 
 def fetch_latest_news():
     try:
-        if not CRYPTO_PANIC_API:
-            logging.warning("CryptoPanic API not set")
-            return ""
-
-        url = "https://cryptopanic.com/api/v1/posts/"
-        params = {
-            "auth_token": CRYPTO_PANIC_API,
-            "currencies": "BTC,ETH,SOL",
-            "kind": "news",
-            "public": "true"
-        }
-
-        r = requests.get(url, params=params, timeout=20)
+        rss_url = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+        r = requests.get(rss_url, timeout=20)
 
         if r.status_code != 200:
-            logging.error(f"News API error: {r.status_code}")
+            logging.error("RSS fetch failed")
             return ""
 
-        results = r.json().get("results", [])[:3]
+        root = ET.fromstring(r.content)
 
-        if not results:
-            return ""
+        news_text = "\n📰 LATEST BTC • ETH • SOL NEWS:\n"
 
-        news_text = "\n📰 LATEST CRYPTO NEWS:\n"
-        for item in results:
-            news_text += f"• {item['title']}\n"
+        count = 0
 
-        return news_text
+        for item in root.iter("item"):
+            title = item.find("title").text.upper()
+
+            if any(keyword in title for keyword in COINS):
+                news_text += f"• {item.find('title').text}\n"
+                count += 1
+
+            if count >= 3:
+                break
+
+        return news_text if count > 0 else ""
 
     except Exception as e:
-        logging.error(f"News fetch error: {e}")
+        logging.error(f"RSS error: {e}")
         return ""
 
 # ================= CHART =================
@@ -157,13 +156,16 @@ def generate_price_chart(data):
 # ================= SCAN =================
 
 def scan():
-    logging.info("=== MARKET SCAN TRIGGERED ===")
+    logging.info("=== CHAIN MOMENTUM SCAN ===")
 
     data = fetch_market_data()
     if not data:
         return
 
-    message = "🚨 MARKET UPDATE 🚨\n\n"
+    message = "━━━━━━━━━━━━━━━━━━\n"
+    message += "🚀 CHAIN MOMENTUM\n"
+    message += "📊 Premium Market Report\n"
+    message += "━━━━━━━━━━━━━━━━━━\n\n"
 
     for coin in COINS:
         price = data[coin]["quote"]["USD"]["price"]
@@ -171,11 +173,13 @@ def scan():
 
         status = "🟢 Bullish" if change_24h > 0 else "🔴 Bearish"
 
-        message += f"{coin} → ${price:,.2f}\n"
-        message += f"24h Change: {change_24h:.2f}% | {status}\n\n"
+        message += f"💎 {coin}\n"
+        message += f"💰 Price: ${price:,.2f}\n"
+        message += f"📊 24H: {change_24h:.2f}% | {status}\n\n"
 
     message += fetch_latest_news()
-    message += "\n#Crypto #BTC #ETH #SOL"
+    message += "\n━━━━━━━━━━━━━━━━━━\n"
+    message += "#Crypto #BTC #ETH #SOL"
 
     image_path = generate_price_chart(data)
 
