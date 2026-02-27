@@ -108,16 +108,17 @@ def fetch_data(symbol):
 # ================= SCAN =================
 
 def scan():
+    print("🔥 SCAN FUNCTION TRIGGERED 🔥")
     logging.info("=== SCANNING MULTI COIN ===")
 
-    full_message = "🚨 MARKET SCAN REPORT 🚨\n"
+    message = "🚨 MARKET SCAN REPORT 🚨\n\n"
 
     for symbol in PAIRS:
 
         df = fetch_data(symbol)
 
         if df is None or len(df) < 210:
-            logging.warning(f"{symbol} data not ready")
+            message += f"{symbol.replace('USDT','')} → Data Error ❌\n"
             continue
 
         price = df["close"].iloc[-1]
@@ -125,28 +126,27 @@ def scan():
         ema200 = df["ema200"].iloc[-1]
         rsi = df["rsi"].iloc[-1]
 
-        signal = "NEUTRAL"
+        # ===== STATUS LOGIC =====
+        if ema50 > ema200 and rsi > 55:
+            status = "Bullish 🚀"
+        elif ema50 < ema200 and rsi < 45:
+            status = "Bearish 🔻"
+        else:
+            status = "Neutral ⚖️"
 
-        if ema50 > ema200 and rsi > 50:
-            signal = "BUY 🚀"
-        elif ema50 < ema200 and rsi < 50:
-            signal = "SELL 🔻"
+        message += (
+            f"{symbol.replace('USDT','')}\n"
+            f"Price : ${price:,.2f}\n"
+            f"RSI   : {rsi:.2f}\n"
+            f"Status: {status}\n\n"
+        )
 
-        full_message += f"""
-{symbol.replace('USDT','')}
-Price : ${price:,.2f}
-EMA50 : {ema50:,.2f}
-EMA200: {ema200:,.2f}
-RSI   : {rsi:.2f}
-Signal: {signal}
-"""
+    message += "#Crypto #BTC #ETH #SOL"
 
-    full_message += "\n#Crypto"
+    send_telegram(message)
+    post_twitter(message)
 
-    send_telegram(full_message)
-    post_twitter(full_message)
-
-    logging.info("Scan finished")
+    logging.info("Market scan sent successfully")
 
 # ================= SCHEDULER =================
 
