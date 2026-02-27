@@ -149,31 +149,31 @@ def scan():
     logging.info("Market scan sent successfully")
 
 # ================= SCHEDULER =================
+# ================= FLASK =================
+
+app = Flask(__name__)
+
+# ================= SCHEDULER =================
 
 scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
 
 def start_scheduler():
+    if scheduler.get_jobs():
+        return  # cegah dobel
+
     scheduler.add_job(
         scan,
         trigger="cron",
-    hour="*/4",
-    minute=5
+        hour="*/4",
+        minute=5
     )
+
     scheduler.start()
     logging.info("Scheduler Started")
 
-# AUTO START (PENTING UNTUK RAILWAY)
-if not scheduler.running:
-    start_scheduler()
+# START SEKALI SAJA
+start_scheduler()
 
-# ================= FLASK =================
-
-app = Flask(__name__)
-@app.before_first_request
-def activate_scheduler():
-    if not scheduler.running:
-        start_scheduler()
-        logging.info("Scheduler activated")
 @app.route("/")
 def home():
     return "ELITE BOT RUNNING", 200
