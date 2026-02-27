@@ -99,20 +99,26 @@ def fetch_market_data():
 
 def fetch_latest_news():
     try:
-        rss_url = "https://cryptocompare.com/api/data/v2/news/?lang=EN"
+        rss_url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
         r = requests.get(rss_url, timeout=20)
 
         if r.status_code != 200:
+            logging.error(f"News status: {r.status_code}")
             return ""
 
         data = r.json()
+
+        if "Data" not in data:
+            logging.error("No 'Data' key in response")
+            return ""
 
         news_text = "\n📰 MARKET HEADLINES\n"
         news_text += "──────────────────\n"
 
         for article in data["Data"][:3]:
-            title = article["title"]
-            news_text += f"• {title}\n"
+            title = article.get("title", "")
+            if title:
+                news_text += f"• {title}\n"
 
         return news_text
 
