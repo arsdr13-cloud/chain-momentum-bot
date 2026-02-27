@@ -94,6 +94,44 @@ def fetch_data(symbol):
         logging.error(f"{symbol} error: {e}")
         return None
 
+# ================= NEWS FETCH =================
+
+CRYPTO_PANIC_API = os.getenv("CRYPTO_PANIC_API")
+
+def fetch_latest_news():
+    try:
+        if not CRYPTO_PANIC_API:
+            return ""
+
+        url = "https://cryptopanic.com/api/v1/posts/"
+        params = {
+            "auth_token": CRYPTO_PANIC_API,
+            "currencies": "BTC,ETH,SOL",
+            "kind": "news",
+            "public": "true"
+        }
+
+        r = requests.get(url, params=params, timeout=15)
+
+        if r.status_code != 200:
+            logging.error(f"News API error: {r.status_code}")
+            return ""
+
+        data = r.json()
+        results = data.get("results", [])[:3]
+
+        news_text = "\n📰 LATEST CRYPTO NEWS:\n"
+
+        for item in results:
+            title = item["title"]
+            news_text += f"• {title}\n"
+
+        return news_text
+
+    except Exception as e:
+        logging.error(f"News fetch error: {e}")
+        return ""
+
 # ================= CHART GENERATOR =================
 
 def generate_combined_chart(data_dict):
@@ -155,7 +193,11 @@ def scan():
 
         message += f"{symbol.replace('USDT','')} → ${price:,.2f} | {status}\n"
 
-    message += "\n#Crypto #BTC #ETH #SOL"
+    # Tambah berita terbaru
+news_section = fetch_latest_news()
+
+message += news_section
+message += "\n#Crypto #BTC #ETH #SOL"
 
     if data_dict:
         image_path = generate_combined_chart(data_dict)
