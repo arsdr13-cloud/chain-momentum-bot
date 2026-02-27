@@ -101,6 +101,7 @@ def fetch_latest_news():
     try:
         rss_url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
         r = requests.get(rss_url, timeout=20)
+logging.info(f"News response: {r.text[:500]}")
 
         if r.status_code != 200:
             logging.error(f"News status: {r.status_code}")
