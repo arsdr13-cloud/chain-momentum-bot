@@ -1,7 +1,6 @@
 import os
 import logging
 import requests
-import pandas as pd
 import matplotlib.pyplot as plt
 from flask import Flask
 import tweepy
@@ -10,14 +9,14 @@ import tweepy
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-CRYPTO_PANIC_API = os.getenv("CRYPTO_PANIC_API")
+CMC_API_KEY = os.getenv("CMC_API_KEY")
 
 TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
 TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
 
-PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+COINS = ["BTC", "ETH", "SOL"]
 
 logging.basicConfig(level=logging.INFO)
 
@@ -65,102 +64,54 @@ def post_twitter_with_image(message, image_path):
     except Exception as e:
         logging.error(f"Twitter error: {e}")
 
-# ================= DATA FETCH =================
+# ================= CMC FETCH =================
 
-import requests
-import pandas as pd
-
-def fetch_data(symbol="BTCUSDT", interval="1h", limit=100):
-    url = "https://data-api.binance.vision/api/v3/klines"
-
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "limit": limit
-    }
-
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-
-    response = requests.get(url, params=params, headers=headers, timeout=10)
-
-    if response.status_code != 200:
-        print(f"{symbol} Binance error: {response.status_code}")
-        return None
-
-    data = response.json()
-
-    df = pd.DataFrame(data, columns=[
-        "timestamp","open","high","low","close","volume",
-        "close_time","qav","num_trades",
-        "taker_base_vol","taker_quote_vol","ignore"
-    ])
-
-    df["close"] = df["close"].astype(float)
-    return df
-
-# ================= NEWS FETCH =================
-
-def fetch_latest_news():
+def fetch_market_data():
     try:
-        if not CRYPTO_PANIC_API:
-            return ""
+        url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
 
-        url = "https://CRYPTO_PANIC_API/api/v1/posts/"
-        params = {
-            "auth_token": CRYPTO_PANIC_API,
-            "currencies": "BTC,ETH,SOL",
-            "kind": "news",
-            "public": "true"
+        headers = {
+            "X-CMC_PRO_API_KEY": CMC_API_KEY
         }
 
-        r = requests.get(url, params=params, timeout=20)
+        params = {
+            "symbol": ",".join(COINS),
+            "convert": "USD"
+        }
+
+        r = requests.get(url, headers=headers, params=params, timeout=20)
 
         if r.status_code != 200:
-            logging.error(f"News API error: {r.status_code}")
-            return ""
+            logging.error(f"CMC error: {r.status_code}")
+            return None
 
-        results = r.json().get("results", [])[:3]
-
-        news_text = "\n📰 LATEST CRYPTO NEWS:\n"
-        for item in results:
-            news_text += f"• {item['title']}\n"
-
-        return news_text
+        return r.json()["data"]
 
     except Exception as e:
-        logging.error(f"News error: {e}")
-        return ""
+        logging.error(f"CMC fetch error: {e}")
+        return None
 
 # ================= CHART =================
 
-def generate_combined_chart(data_dict):
+def generate_price_chart(data):
     plt.style.use("dark_background")
 
-    rows = len(data_dict)
-    fig, axes = plt.subplots(rows, 1, figsize=(10, 4*rows))
+    coins = []
+    prices = []
 
-    if rows == 1:
-        axes = [axes]
+    for coin in COINS:
+        price = data[coin]["quote"]["USD"]["price"]
+        coins.append(coin)
+        prices.append(price)
 
-    fig.suptitle("CHAIN MOMENTUM MARKET REPORT", fontsize=16)
+    plt.figure(figsize=(8, 5))
+    plt.bar(coins, prices)
 
-    for ax, (symbol, df) in zip(axes, data_dict.items()):
-        ax.plot(df["close"], label="Price")
-        ax.plot(df["ema50"], linestyle="--", label="EMA50")
-        ax.plot(df["ema200"], linestyle="--", label="EMA200")
-        ax.set_title(symbol.replace("USDT",""))
-        ax.legend()
-
-    fig.text(0.5, 0.02,
-             "© Chain Momentum | Crypto Intelligence",
-             ha="center",
-             fontsize=9,
-             alpha=0.6)
+    plt.title("CHAIN MOMENTUM MARKET REPORT")
+    plt.ylabel("Price (USD)")
+    plt.tight_layout()
 
     filename = "market_report.png"
-    plt.tight_layout()
     plt.savefig(filename)
     plt.close()
 
@@ -171,31 +122,27 @@ def generate_combined_chart(data_dict):
 def scan():
     logging.info("=== MARKET SCAN TRIGGERED ===")
 
-    message = "🚨 MARKET SCAN REPORT 🚨\n\n"
-    data_dict = {}
+    data = fetch_market_data()
+    if not data:
+        return
 
-    for symbol in PAIRS:
-        df = fetch_data(symbol)
-        if df is None or len(df) < 50:
-            continue
+    message = "🚨 MARKET UPDATE 🚨\n\n"
 
-        data_dict[symbol] = df
+    for coin in COINS:
+        price = data[coin]["quote"]["USD"]["price"]
+        change_24h = data[coin]["quote"]["USD"]["percent_change_24h"]
 
-        price = df["close"].iloc[-1]
-        ema50 = df["ema50"].iloc[-1]
-        ema200 = df["ema200"].iloc[-1]
+        status = "🟢 Bullish" if change_24h > 0 else "🔴 Bearish"
 
-        status = "Bullish 🚀" if ema50 > ema200 else "Bearish 🔻" if ema50 < ema200 else "Neutral ⚖️"
+        message += f"{coin} → ${price:,.2f}\n"
+        message += f"24h Change: {change_24h:.2f}% | {status}\n\n"
 
-        message += f"{symbol.replace('USDT','')} → ${price:,.2f} | {status}\n"
+    message += "#Crypto #BTC #ETH #SOL"
 
-    message += fetch_latest_news()
-    message += "\n#Crypto #BTC #ETH #SOL"
+    image_path = generate_price_chart(data)
 
-    if data_dict:
-        image_path = generate_combined_chart(data_dict)
-        send_telegram_photo(image_path, message)
-        post_twitter_with_image(message, image_path)
+    send_telegram_photo(image_path, message)
+    post_twitter_with_image(message, image_path)
 
 # ================= ROUTES =================
 
