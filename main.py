@@ -16,15 +16,22 @@ TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
 TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
-print("TW_API_KEY:", TW_API_KEY)
-print("TW_ACCESS_TOKEN:", TW_ACCESS_TOKEN)
-print("TW_API_SECRET:", TW_API_SECRET)
-print("TW_ACCESS_SECRET:", TW_ACCESS_SECRET)
+
 COINS = ["BTC", "ETH", "SOL"]
 
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
+def run_scan():
+    print("Scanning...")
 
+@app.route("/")
+def home():
+    return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
+
+@app.route("/run-scan")
+def run_scan():
+    scan()
+    return "✅ SCAN EXECUTED", 200
 # ================= TELEGRAM =================
 
 def send_telegram_photo(photo_path, caption):
@@ -292,16 +299,6 @@ def scan():
 
     logging.info("SCAN FINISHED")
 
-# ================= ROUTES =================
-
-@app.route("/")
-def home():
-    return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
-
-@app.route("/run-scan")
-def run_scan():
-    scan()
-    return "✅ SCAN EXECUTED", 200
 
 # ================= START =================
 
