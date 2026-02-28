@@ -30,10 +30,7 @@ def send_telegram_photo(photo_path, caption):
         with open(photo_path, "rb") as img:
             requests.post(
                 url,
-                data={
-                    "chat_id": CHAT_ID,
-                    "caption": caption[:1024]
-                },
+                data={"chat_id": CHAT_ID, "caption": caption[:1024]},
                 files={"photo": img},
                 timeout=20
             )
@@ -41,7 +38,7 @@ def send_telegram_photo(photo_path, caption):
     except Exception as e:
         logging.error(f"Telegram error: {e}")
 
-# ================= TWITTER =================
+# ================= TWITTER (CLEAN - NO AUTO LIKE) =================
 
 def post_twitter_with_image(message, image_path):
     try:
@@ -51,8 +48,8 @@ def post_twitter_with_image(message, image_path):
             TW_ACCESS_TOKEN,
             TW_ACCESS_SECRET
         )
-        api = tweepy.API(auth)
-        media = api.media_upload(image_path)
+        api_v1 = tweepy.API(auth)
+        media = api_v1.media_upload(image_path)
 
         client = tweepy.Client(
             consumer_key=TW_API_KEY,
@@ -66,7 +63,7 @@ def post_twitter_with_image(message, image_path):
             media_ids=[media.media_id]
         )
 
-        logging.info("Tweet sent successfully")
+        logging.info("Tweet posted successfully")
 
     except Exception as e:
         logging.error(f"Twitter error: {e}")
@@ -76,7 +73,6 @@ def post_twitter_with_image(message, image_path):
 def fetch_market_data():
     try:
         url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-
         headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
         params = {"symbol": ",".join(COINS), "convert": "USD"}
 
@@ -100,38 +96,23 @@ def fetch_latest_news():
         r = requests.get(url, timeout=20)
 
         if r.status_code != 200:
-            return ""
+            return "No major crypto headlines today."
 
         data = r.json()
-        news_text = ""
-
-        for article in data.get("Data", [])[:3]:
+        for article in data.get("Data", []):
             title = article.get("title", "")
             if title:
-                news_text += f"• {title}\n"
+                return title
 
-        return news_text.strip()
-
+        return "No major crypto headlines today."
     except:
-        return ""
-
-def extract_first_headline(news):
-    if not news:
         return "No major crypto headlines today."
 
-    for line in news.split("\n"):
-        if line.startswith("•"):
-            return line.replace("• ", "").strip()
-
-    return "No major crypto headlines today."
-
-# ================= TWITTER TEXT (INSTITUTIONAL) =================
+# ================= TWITTER TEXT (INSTITUTIONAL + CTA) =================
 
 def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
 
-    news = fetch_latest_news()
-    first_headline = extract_first_headline(news)
-
+    headline = fetch_latest_news()
     avg_change = (btc_change + eth_change + sol_change) / 3
 
     if avg_change < -3:
@@ -147,17 +128,21 @@ BTC ${btc_price:,.0f} ({btc_change:.2f}%)
 ETH ${eth_price:,.0f} ({eth_change:.2f}%)
 SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
-📰 {first_headline}
+📰 {headline}
 
 {market_status}
-Institutional positioning in focus.
 
-#Crypto #BTC #ETH #SOL"""
+Are institutions accumulating or distributing?
+On-chain flows in focus.
 
-    if len(tweet_text) > 275:
-        tweet_text = tweet_text[:272] + "..."
+#Crypto #BTC #ETH #SOL
 
-    return tweet_text
+💬 Follow for daily institutional insights  
+🔁 Retweet to share market intelligence  
+❤️ Like if you trade smart
+"""
+
+    return tweet_text[:280]
 
 # ================= TELEGRAM MESSAGE (HEDGE FUND STYLE) =================
 
@@ -189,8 +174,17 @@ def build_telegram_message(data):
         strategy = "Trend Following"
         volatility = "Stable"
 
-    news = fetch_latest_news()
-    first_headline = extract_first_headline(news)
+    # Institutional Insight
+    if avg_change < -5:
+        insight = "Broad market distribution phase detected."
+    elif avg_change < -2:
+        insight = "Sell pressure increasing across majors."
+    elif avg_change < 0:
+        insight = "Short-term corrective structure."
+    else:
+        insight = "Momentum expansion phase."
+
+    headline = fetch_latest_news()
 
     message = f"""🚀 CHAIN MOMENTUM REPORT
 🕒 {now}
@@ -204,42 +198,54 @@ SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
 📊 Volatility Index : {volatility}
 🛡 Suggested Strategy : {strategy}
 
+🧠 Market Insight :
+{insight}
+
 📰 Top Headline
-{first_headline}
+{headline}
 
 Stay Ahead. Trade Smart.
 """
 
     return message
 
-# ================= PROFESSIONAL CHART =================
+# ================= PREMIUM DARK CHART =================
 
 def generate_chart(btc_change, eth_change, sol_change):
 
     coins = ["BTC", "ETH", "SOL"]
     changes = [btc_change, eth_change, sol_change]
+    colors = ["#00C853" if c >= 0 else "#D50000" for c in changes]
 
-    colors = ["green" if c >= 0 else "red" for c in changes]
+    plt.figure(figsize=(8,5), facecolor="#111111")
+    ax = plt.gca()
+    ax.set_facecolor("#111111")
 
-    plt.figure()
     bars = plt.bar(coins, changes, color=colors)
 
     for bar in bars:
         height = bar.get_height()
         plt.text(
-            bar.get_x() + bar.get_width() / 2,
+            bar.get_x() + bar.get_width()/2,
             height,
             f"{height:.2f}%",
             ha="center",
-            va="bottom"
+            va="bottom",
+            color="white",
+            fontweight="bold"
         )
 
-    plt.title("Chain Momentum Market Change (%)")
-    plt.ylabel("24H Change (%)")
+    plt.axhline(0, color="white", linewidth=1)
+
+    plt.title("CHAIN MOMENTUM | 24H CHANGE", color="white", fontweight="bold")
+    plt.ylabel("24H %", color="white")
+    plt.xticks(color="white")
+    plt.yticks(color="white")
+
     plt.tight_layout()
 
     filename = "market_chart.png"
-    plt.savefig(filename)
+    plt.savefig(filename, facecolor="#111111")
     plt.close()
 
     return filename
@@ -252,7 +258,6 @@ def scan():
 
     data = fetch_market_data()
     if not data:
-        logging.error("No market data")
         return
 
     btc_price = data["BTC"]["quote"]["USD"]["price"]
