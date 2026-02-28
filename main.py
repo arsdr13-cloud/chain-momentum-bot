@@ -8,33 +8,40 @@ from datetime import datetime
 
 # ================= CONFIG =================
 
-client = tweepy.Client(
-   
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 CMC_API_KEY = os.getenv("CMC_API_KEY")
-TW_BEARER_TOKEN = os.getenv("TW_BEARER_TOKEN") 
+
+TW_BEARER_TOKEN = os.getenv("TW_BEARER_TOKEN")
 TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
 TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
-wait_on_rate_limit=True
-)
+
 COINS = ["BTC", "ETH", "SOL"]
 
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-def run_scan():
-    print("Scanning...")
 
-@app.route("/")
-def home():
-    return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
+# ================= TWITTER CLIENT =================
 
-@app.route("/run-scan")
-def run_scan():
-    scan()
-    return "✅ SCAN EXECUTED", 200
+client = tweepy.Client(
+    bearer_token=TW_BEARER_TOKEN,
+    consumer_key=TW_API_KEY,
+    consumer_secret=TW_API_SECRET,
+    access_token=TW_ACCESS_TOKEN,
+    access_token_secret=TW_ACCESS_SECRET,
+    wait_on_rate_limit=True
+)
+
+auth_v1 = tweepy.OAuth1UserHandler(
+    TW_API_KEY,
+    TW_API_SECRET,
+    TW_ACCESS_TOKEN,
+    TW_ACCESS_SECRET
+)
+api_v1 = tweepy.API(auth_v1)
+
 # ================= TELEGRAM =================
 
 def send_telegram_photo(photo_path, caption):
@@ -51,42 +58,21 @@ def send_telegram_photo(photo_path, caption):
     except Exception as e:
         logging.error(f"Telegram error: {e}")
 
-# ================= TWITTER (CLEAN - NO AUTO LIKE) =================
-
-# ================= TWITTER (CLEAN - WORKING) =================
+# ================= TWITTER =================
 
 def post_twitter_with_image(message, image_path):
     try:
-        auth = tweepy.OAuth1UserHandler(
-            TW_API_KEY,
-            TW_API_SECRET,
-            TW_ACCESS_TOKEN,
-            TW_ACCESS_SECRET
-        )
-
-        api_v1 = tweepy.API(auth)
-
         media = api_v1.media_upload(image_path)
-
-        client = tweepy.Client(
-            consumer_key=TW_API_KEY,
-            consumer_secret=TW_API_SECRET,
-            access_token=TW_ACCESS_TOKEN,
-            access_token_secret=TW_ACCESS_SECRET
-        )
 
         client.create_tweet(
             text=message,
             media_ids=[media.media_id]
         )
-        client.create_tweet(text="Test tweet Railway v2 working 🚀")
 
         logging.info("Tweet posted successfully")
 
     except Exception as e:
         logging.error(f"Twitter error: {e}")
-
-        
 
 # ================= MARKET DATA =================
 
@@ -128,7 +114,7 @@ def fetch_latest_news():
     except:
         return "No major crypto headlines today."
 
-# ================= TWITTER TEXT (INSTITUTIONAL + CTA) =================
+# ================= BUILD TWITTER TEXT =================
 
 def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
 
@@ -152,19 +138,12 @@ SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
 {market_status}
 
-Are institutions accumulating or distributing?
-On-chain flows in focus.
-
 #Crypto #BTC #ETH #SOL
-
-💬 Follow for daily institutional insights  
-🔁 Retweet to share market intelligence  
-❤️ Like if you trade smart
 """
 
     return tweet_text[:280]
 
-# ================= TELEGRAM MESSAGE (HEDGE FUND STYLE) =================
+# ================= BUILD TELEGRAM MESSAGE =================
 
 def build_telegram_message(data):
 
@@ -179,57 +158,21 @@ def build_telegram_message(data):
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
-    avg_change = (btc_change + eth_change + sol_change) / 3
-
-    if avg_change < -3:
-        risk_level = "HIGH"
-        strategy = "Capital Preservation"
-        volatility = "Elevated"
-    elif avg_change < 0:
-        risk_level = "MODERATE"
-        strategy = "Reduce Leverage"
-        volatility = "Medium"
-    else:
-        risk_level = "LOW"
-        strategy = "Trend Following"
-        volatility = "Stable"
-
-    # Institutional Insight
-    if avg_change < -5:
-        insight = "Broad market distribution phase detected."
-    elif avg_change < -2:
-        insight = "Sell pressure increasing across majors."
-    elif avg_change < 0:
-        insight = "Short-term corrective structure."
-    else:
-        insight = "Momentum expansion phase."
-
     headline = fetch_latest_news()
 
     message = f"""🚀 CHAIN MOMENTUM REPORT
 🕒 {now}
 
-📊 MARKET SNAPSHOT
 BTC : ${btc_price:,.0f} ({btc_change:.2f}%)
 ETH : ${eth_price:,.0f} ({eth_change:.2f}%)
 SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
 
-📈 Risk Level : {risk_level}
-📊 Volatility Index : {volatility}
-🛡 Suggested Strategy : {strategy}
-
-🧠 Market Insight :
-{insight}
-
-📰 Top Headline
-{headline}
-
-Stay Ahead. Trade Smart.
+📰 {headline}
 """
 
     return message
 
-# ================= PREMIUM DARK CHART =================
+# ================= CHART =================
 
 def generate_chart(btc_change, eth_change, sol_change):
 
@@ -251,19 +194,13 @@ def generate_chart(btc_change, eth_change, sol_change):
             f"{height:.2f}%",
             ha="center",
             va="bottom",
-            color="white",
-            fontweight="bold"
+            color="white"
         )
 
     plt.axhline(0, color="white", linewidth=1)
-
-    plt.title("CHAIN MOMENTUM | 24H CHANGE", color="white", fontweight="bold")
-    plt.ylabel("24H %", color="white")
-    plt.xticks(color="white")
-    plt.yticks(color="white")
+    plt.title("CHAIN MOMENTUM | 24H CHANGE", color="white")
 
     plt.tight_layout()
-
     filename = "market_chart.png"
     plt.savefig(filename, facecolor="#111111")
     plt.close()
@@ -303,6 +240,16 @@ def scan():
 
     logging.info("SCAN FINISHED")
 
+# ================= ROUTES =================
+
+@app.route("/")
+def home():
+    return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
+
+@app.route("/run-scan")
+def run_scan_route():
+    scan()
+    return "✅ SCAN EXECUTED", 200
 
 # ================= START =================
 
