@@ -243,7 +243,7 @@ def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, 
     if news:
         first_headline = news.split("\n")[0]
     else:
-        first_headline = "No major crypto headlines today."
+        first_headline = "No major crypto headlines today." 
 
     tweet_text = f"""🚀 CHAIN MOMENTUM UPDATE
 
