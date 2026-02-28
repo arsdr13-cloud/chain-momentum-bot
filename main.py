@@ -236,7 +236,21 @@ def scan():
 
     logging.info("SCAN FINISHED")
 
+# ================= ROUTES =================
 
+@app.route("/")
+def home():
+    return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
+
+
+@app.route("/run-scan")
+def run_scan():
+    try:
+        scan()
+        return "✅ SCAN EXECUTED", 200
+    except Exception as e:
+        logging.error(f"Scan route error: {e}")
+        return f"Error: {e}", 500
    
   # ================= START =================
 
