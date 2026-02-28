@@ -263,6 +263,7 @@ Stay Ahead. Trade Smart.
         tweet_text = tweet_text[:272] + "..."
 
     return tweet_text
+    print("NEWS RESULT:", news)
 
 # ================= SCAN =================
 
