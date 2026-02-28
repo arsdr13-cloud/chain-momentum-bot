@@ -8,15 +8,18 @@ from datetime import datetime
 
 # ================= CONFIG =================
 
+client = tweepy.Client(
+   
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 CMC_API_KEY = os.getenv("CMC_API_KEY")
-
+TW_BEARER_TOKEN = os.getenv("TW_BEARER_TOKEN") 
 TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
 TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
-
+wait_on_rate_limit=True
+)
 COINS = ["BTC", "ETH", "SOL"]
 
 logging.basicConfig(level=logging.INFO)
@@ -76,6 +79,7 @@ def post_twitter_with_image(message, image_path):
             text=message,
             media_ids=[media.media_id]
         )
+        client.create_tweet(text="Test tweet Railway v2 working 🚀")
 
         logging.info("Tweet posted successfully")
 
