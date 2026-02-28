@@ -43,9 +43,27 @@ def send_telegram_photo(photo_path, caption):
 
 # ================= TWITTER (CLEAN - NO AUTO LIKE) =================
 
+# ================= TWITTER (CLEAN - WORKING) =================
+
 def post_twitter_with_image(message, image_path):
     try:
+        auth = tweepy.OAuth1UserHandler(
+            TW_API_KEY,
+            TW_API_SECRET,
+            TW_ACCESS_TOKEN,
+            TW_ACCESS_SECRET
+        )
+
+        api_v1 = tweepy.API(auth)
+
         media = api_v1.media_upload(image_path)
+
+        client = tweepy.Client(
+            consumer_key=TW_API_KEY,
+            consumer_secret=TW_API_SECRET,
+            access_token=TW_ACCESS_TOKEN,
+            access_token_secret=TW_ACCESS_SECRET
+        )
 
         client.create_tweet(
             text=message,
@@ -56,22 +74,6 @@ def post_twitter_with_image(message, image_path):
 
     except Exception as e:
         logging.error(f"Twitter error: {e}")
-    try:
-        auth = tweepy.OAuth1UserHandler(
-            TW_API_KEY,
-            TW_API_SECRET,
-            TW_ACCESS_TOKEN,
-            TW_ACCESS_SECRET
-        )
-        api_v1 = tweepy.API(auth)
-        media = api_v1.media_upload(image_path)
-
-        client = tweepy.Client(
-            consumer_key=TW_API_KEY,
-            consumer_secret=TW_API_SECRET,
-            access_token=TW_ACCESS_TOKEN,
-            access_token_secret=TW_ACCESS_SECRET
-        )
 
         
 
