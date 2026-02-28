@@ -142,7 +142,7 @@ BTC Dominance: {btc_dominance:.2f}%
 
 Are smart money accumulating — or distributing?
 
-❤️ Like | 🔁 Repost | ➕ Follow @Chain_Momentum
+❤️ Like | 🔁 Repost | ➕ Follow Chain_Momentum
 
 #Crypto #BTC #ETH #SOL
 """
