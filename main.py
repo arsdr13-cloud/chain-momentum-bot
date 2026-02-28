@@ -85,13 +85,11 @@ def fetch_market_data():
         r = requests.get(url, headers=headers, params=params, timeout=20)
 
         if r.status_code != 200:
-            logging.error(f"CMC error: {r.status_code}")
             return None
 
         return r.json()["data"]
 
-    except Exception as e:
-        logging.error(f"CMC fetch error: {e}")
+    except:
         return None
 
 # ================= BTC DOMINANCE =================
@@ -103,32 +101,12 @@ def fetch_btc_dominance():
         r = requests.get(url, headers=headers, timeout=20)
 
         if r.status_code != 200:
-            return None
+            return 0
 
         data = r.json()
         return data["data"]["btc_dominance"]
     except:
-        return None
-
-# ================= NEWS =================
-
-def fetch_latest_news():
-    try:
-        url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
-        r = requests.get(url, timeout=20)
-
-        if r.status_code != 200:
-            return "No major crypto headlines today."
-
-        data = r.json()
-        for article in data.get("Data", []):
-            title = article.get("title", "")
-            if title:
-                return title
-
-        return "No major crypto headlines today."
-    except:
-        return "No major crypto headlines today."
+        return 0
 
 # ================= SENTIMENT ENGINE =================
 
@@ -162,7 +140,9 @@ BTC Dominance: {btc_dominance:.2f}%
 {sentiment}
 {insight}
 
-Are smart money accumulating here — or distributing?
+Are smart money accumulating — or distributing?
+
+❤️ Like | 🔁 Repost | ➕ Follow @Chain_Momentum
 
 #Crypto #BTC #ETH #SOL
 """
@@ -187,8 +167,6 @@ def build_telegram_message(data, btc_dominance):
     avg_change = (btc_change + eth_change + sol_change) / 3
     sentiment, insight = detect_market_sentiment(avg_change)
 
-    headline = fetch_latest_news()
-
     message = f"""🚀 CHAIN MOMENTUM REPORT
 ━━━━━━━━━━━━━━━━━━
 🕒 {now}
@@ -205,9 +183,6 @@ def build_telegram_message(data, btc_dominance):
 {insight}
 
 ━━━━━━━━━━━━━━━━━━
-📰 Top Headline :
-{headline}
-
 Stay Ahead. Trade Smart.
 """
 
@@ -241,6 +216,18 @@ def generate_chart(btc_change, eth_change, sol_change):
     plt.axhline(0, color="white", linewidth=1)
     plt.title("CHAIN MOMENTUM | 24H CHANGE", color="white")
 
+    # ===== WATERMARK =====
+    plt.text(
+        0.95, 0.05,
+        "ChainMomentum",
+        transform=ax.transAxes,
+        fontsize=10,
+        color="white",
+        alpha=0.4,
+        ha="right",
+        va="bottom"
+    )
+
     plt.tight_layout()
     filename = "market_chart.png"
     plt.savefig(filename, facecolor="#111111")
@@ -258,7 +245,7 @@ def scan():
     if not data:
         return
 
-    btc_dominance = fetch_btc_dominance() or 0
+    btc_dominance = fetch_btc_dominance()
 
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
