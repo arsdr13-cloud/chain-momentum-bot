@@ -94,6 +94,22 @@ def fetch_market_data():
         logging.error(f"CMC fetch error: {e}")
         return None
 
+# ================= BTC DOMINANCE =================
+
+def fetch_btc_dominance():
+    try:
+        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
+        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
+        r = requests.get(url, headers=headers, timeout=20)
+
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+        return data["data"]["btc_dominance"]
+    except:
+        return None
+
 # ================= NEWS =================
 
 def fetch_latest_news():
@@ -114,29 +130,39 @@ def fetch_latest_news():
     except:
         return "No major crypto headlines today."
 
+# ================= SENTIMENT ENGINE =================
+
+def detect_market_sentiment(avg_change):
+    if avg_change < -5:
+        return "🔴 Extreme Fear", "Distribution phase intensifying. Liquidity risk rising."
+    elif avg_change < -2:
+        return "🟠 Risk-Off", "Defensive positioning dominates. Institutions cautious."
+    elif avg_change < 0:
+        return "🟡 Neutral-Bearish", "Mild correction. Monitoring structure."
+    elif avg_change < 3:
+        return "🟢 Neutral-Bullish", "Controlled momentum building."
+    else:
+        return "🚀 Strong Risk-On", "Expansion phase active. Breakout watch."
+
 # ================= BUILD TWITTER TEXT =================
 
-def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
+def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change, btc_dominance):
 
-    headline = fetch_latest_news()
     avg_change = (btc_change + eth_change + sol_change) / 3
+    sentiment, insight = detect_market_sentiment(avg_change)
 
-    if avg_change < -3:
-        market_status = "⚠️ High Volatility | Defensive Mode"
-    elif avg_change < 0:
-        market_status = "📉 Risk-Off Sentiment"
-    else:
-        market_status = "📈 Risk-On Momentum"
-
-    tweet_text = f"""🚀 CHAIN MOMENTUM | Market Pulse
+    tweet_text = f"""🚨 Market Update
 
 BTC ${btc_price:,.0f} ({btc_change:.2f}%)
 ETH ${eth_price:,.0f} ({eth_change:.2f}%)
 SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
-📰 {headline}
+BTC Dominance: {btc_dominance:.2f}%
 
-{market_status}
+{sentiment}
+{insight}
+
+Are smart money accumulating here — or distributing?
 
 #Crypto #BTC #ETH #SOL
 """
@@ -145,7 +171,7 @@ SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
 # ================= BUILD TELEGRAM MESSAGE =================
 
-def build_telegram_message(data):
+def build_telegram_message(data, btc_dominance):
 
     now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
 
@@ -158,16 +184,31 @@ def build_telegram_message(data):
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
+    avg_change = (btc_change + eth_change + sol_change) / 3
+    sentiment, insight = detect_market_sentiment(avg_change)
+
     headline = fetch_latest_news()
 
     message = f"""🚀 CHAIN MOMENTUM REPORT
+━━━━━━━━━━━━━━━━━━
 🕒 {now}
 
-BTC : ${btc_price:,.0f} ({btc_change:.2f}%)
-ETH : ${eth_price:,.0f} ({eth_change:.2f}%)
-SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
+💰 BTC : ${btc_price:,.0f} ({btc_change:.2f}%)
+💰 ETH : ${eth_price:,.0f} ({eth_change:.2f}%)
+💰 SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
 
-📰 {headline}
+━━━━━━━━━━━━━━━━━━
+📊 BTC Dominance : {btc_dominance:.2f}%
+📈 Market Sentiment : {sentiment}
+
+🧠 Insight :
+{insight}
+
+━━━━━━━━━━━━━━━━━━
+📰 Top Headline :
+{headline}
+
+Stay Ahead. Trade Smart.
 """
 
     return message
@@ -217,6 +258,8 @@ def scan():
     if not data:
         return
 
+    btc_dominance = fetch_btc_dominance() or 0
+
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
 
@@ -226,11 +269,12 @@ def scan():
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
-    telegram_message = build_telegram_message(data)
+    telegram_message = build_telegram_message(data, btc_dominance)
     twitter_message = build_twitter_text(
         btc_price, btc_change,
         eth_price, eth_change,
-        sol_price, sol_change
+        sol_price, sol_change,
+        btc_dominance
     )
 
     image_path = generate_chart(btc_change, eth_change, sol_change)
