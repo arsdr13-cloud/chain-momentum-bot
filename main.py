@@ -4,7 +4,6 @@ import requests
 import matplotlib.pyplot as plt
 from flask import Flask
 import tweepy
-import xml.etree.ElementTree as ET
 from datetime import datetime
 
 # ================= CONFIG =================
@@ -42,38 +41,6 @@ def send_telegram_photo(photo_path, caption):
     except Exception as e:
         logging.error(f"Telegram error: {e}")
 
-
-# ==============================
-# TWITTER PREMIUM FORMAT
-# ==============================
-
-def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
-    news = fetch_latest_news()
-
-    # Safety: kalau news kosong
-    if news:
-        first_headline = news.split("\n")[0]
-    else:
-        first_headline = "No major crypto headlines today."
-
-    tweet_text = f"""🚀 CHAIN MOMENTUM UPDATE
-
-BTC: ${btc_price} ({btc_change}%)
-ETH: ${eth_price} ({eth_change}%)
-SOL: ${sol_price} ({sol_change}%)
-
-📰 {first_headline}
-
-Stay Ahead. Trade Smart.
-
-#Crypto #BTC #ETH #SOL"""
-
-    # Batasi maksimal 280 karakter (safe 275)
-    if len(tweet_text) > 275:
-        tweet_text = tweet_text[:272] + "..."
-
-    return tweet_text
-
 # ================= TWITTER =================
 
 def post_twitter_with_image(message, image_path):
@@ -94,30 +61,24 @@ def post_twitter_with_image(message, image_path):
             access_token_secret=TW_ACCESS_SECRET
         )
 
-        response = client.create_tweet(
+        client.create_tweet(
             text=message,
             media_ids=[media.media_id]
         )
 
-        logging.info(f"Tweet sent successfully: {response}")
+        logging.info("Tweet sent successfully")
 
     except Exception as e:
         logging.error(f"Twitter error: {e}")
 
-# ================= COINMARKETCAP =================
+# ================= MARKET DATA =================
 
 def fetch_market_data():
     try:
         url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
 
-        headers = {
-            "X-CMC_PRO_API_KEY": CMC_API_KEY
-        }
-
-        params = {
-            "symbol": ",".join(COINS),
-            "convert": "USD"
-        }
+        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
+        params = {"symbol": ",".join(COINS), "convert": "USD"}
 
         r = requests.get(url, headers=headers, params=params, timeout=20)
 
@@ -131,164 +92,78 @@ def fetch_market_data():
         logging.error(f"CMC fetch error: {e}")
         return None
 
-# ================= RSS NEWS =================
+# ================= NEWS =================
 
 def fetch_latest_news():
     try:
-        rss_url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
-        r = requests.get(rss_url, timeout=20)
-        logging.info(f"News response: {r.text[:500]}")
+        url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
+        r = requests.get(url, timeout=20)
 
         if r.status_code != 200:
-            logging.error(f"News status: {r.status_code}")
             return ""
 
         data = r.json()
+        news_text = ""
 
-        if "Data" not in data:
-            logging.error("No 'Data' key in response")
-            return ""
-
-        news_text = "\n📰 MARKET HEADLINES\n"
-        news_text += "──────────────── \n"
- 
-        for article in data["Data"][:3]:
+        for article in data.get("Data", [])[:3]:
             title = article.get("title", "")
             if title:
                 news_text += f"• {title}\n"
 
-        return news_text
+        return news_text.strip()
 
-    except Exception as e:
-        logging.error(f"News error: {e}")
+    except:
         return ""
 
+def extract_first_headline(news):
+    if not news:
+        return "No major crypto headlines today."
 
-# ================= CHART =================
+    for line in news.split("\n"):
+        if line.startswith("•"):
+            return line.replace("• ", "").strip()
 
-def generate_price_chart(data):
-    plt.style.use("dark_background")
+    return "No major crypto headlines today."
 
-    coins = []
-    prices = []
-
-    for coin in COINS:
-        price = data[coin]["quote"]["USD"]["price"]
-        coins.append(coin)
-        prices.append(price)
-
-    plt.figure(figsize=(8, 5))
-    plt.bar(coins, prices)
-    plt.title("CHAIN MOMENTUM – MARKET SNAPSHOT")
-    plt.ylabel("Price (USD)")
-    plt.tight_layout()
-
-    filename = "market_report.png"
-    plt.savefig(filename)
-    plt.close()
-
-    return filename
-
-# ================= PREMIUM FORMAT =================
-
-def build_premium_message(data):
-
-    now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
-
-    message = "━━━━━━━━━━━━━━━━━━━━━━\n"
-    message += "🚀  CHAIN MOMENTUM\n"
-    message += "📊  Premium Crypto Intelligence\n"
-    message += f"🕒  {now}\n"
-    message += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-
-    total_bullish = 0
-
-    for coin in COINS:
-        price = data[coin]["quote"]["USD"]["price"]
-        change_24h = data[coin]["quote"]["USD"]["percent_change_24h"]
-        volume = data[coin]["quote"]["USD"]["volume_24h"]
-
-        status = "🟢 Bullish Momentum" if change_24h > 0 else "🔴 Bearish Pressure"
-
-        if change_24h > 0:
-            total_bullish += 1
-
-        message += f"💎 {coin}\n"
-        message += f"   💰 Price      : ${price:,.2f}\n"
-        message += f"   📊 24H Change : {change_24h:.2f}%\n"
-        message += f"   💵 Volume     : ${volume:,.0f}\n"
-        message += f"   🔎 Sentiment  : {status}\n\n"
-
-    # Market Summary
-    message += "━━━━━━━━━━━━━━━━━━━━━━\n"
-    message += "🧠 MARKET SUMMARY\n"
-
-    if total_bullish >= 2:
-        message += "Overall Bias: 🟢 Bullish Control\n"
-    else:
-        message += "Overall Bias: 🔴 Defensive Mode\n"
-
-    message += fetch_latest_news()
-
-    message += "\n━━━━━━━━━━━━━━━━━━━━━━\n"
-    message += "#Crypto #BTC #ETH #SOL\n"
-    message += "Stay Ahead. Trade Smart."
-
-    return message
-
-# ================= BUILD TWITTER =================
+# ================= TWITTER TEXT (INSTITUTIONAL) =================
 
 def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
 
     news = fetch_latest_news()
+    first_headline = extract_first_headline(news)
 
-    # ================= HEADLINE EXTRACTION =================
-    if news and news.strip():
-        lines = news.strip().split("\n")
+    avg_change = (btc_change + eth_change + sol_change) / 3
 
-        first_headline = ""
-        for line in lines:
-            if line.startswith("•"):
-                first_headline = line.replace("• ", "").strip()
-                break
-
-        if not first_headline:
-            first_headline = "No major crypto headlines today."
+    if avg_change < -3:
+        market_status = "⚠️ High Volatility | Defensive Mode"
+    elif avg_change < 0:
+        market_status = "📉 Risk-Off Sentiment"
     else:
-        first_headline = "No major crypto headlines today."
+        market_status = "📈 Risk-On Momentum"
 
-    # ================= TWEET FORMAT =================
-    tweet_text = f"""🚀 CHAIN MOMENTUM UPDATE
+    tweet_text = f"""🚀 CHAIN MOMENTUM | Market Pulse
 
-BTC: ${btc_price:,.0f} ({btc_change:.2f}%)
-ETH: ${eth_price:,.0f} ({eth_change:.2f}%)
-SOL: ${sol_price:,.0f} ({sol_change:.2f}%)
+BTC ${btc_price:,.0f} ({btc_change:.2f}%)
+ETH ${eth_price:,.0f} ({eth_change:.2f}%)
+SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
 📰 {first_headline}
 
-Stay Ahead. Trade Smart.
+{market_status}
+Institutional positioning in focus.
 
 #Crypto #BTC #ETH #SOL"""
 
-    # Twitter safe limit
     if len(tweet_text) > 275:
         tweet_text = tweet_text[:272] + "..."
 
     return tweet_text
 
-# ================= SCAN =================
+# ================= TELEGRAM MESSAGE (HEDGE FUND STYLE) =================
 
-def scan():
-    logging.info("=== CHAIN MOMENTUM SCAN ===")
+def build_telegram_message(data):
 
-    data = fetch_market_data()
-    if not data:
-        logging.error("No market data")
-        return
-
-    logging.info("Building messages...")
-
-    telegram_message = build_premium_message(data)
+    now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
 
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
@@ -298,18 +173,107 @@ def scan():
 
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
+
+    avg_change = (btc_change + eth_change + sol_change) / 3
+
+    if avg_change < -3:
+        risk_level = "HIGH"
+        strategy = "Capital Preservation"
+        volatility = "Elevated"
+    elif avg_change < 0:
+        risk_level = "MODERATE"
+        strategy = "Reduce Leverage"
+        volatility = "Medium"
+    else:
+        risk_level = "LOW"
+        strategy = "Trend Following"
+        volatility = "Stable"
+
+    news = fetch_latest_news()
+    first_headline = extract_first_headline(news)
+
+    message = f"""🚀 CHAIN MOMENTUM REPORT
+🕒 {now}
+
+📊 MARKET SNAPSHOT
+BTC : ${btc_price:,.0f} ({btc_change:.2f}%)
+ETH : ${eth_price:,.0f} ({eth_change:.2f}%)
+SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
+
+📈 Risk Level : {risk_level}
+📊 Volatility Index : {volatility}
+🛡 Suggested Strategy : {strategy}
+
+📰 Top Headline
+{first_headline}
+
+Stay Ahead. Trade Smart.
+"""
+
+    return message
+
+# ================= PROFESSIONAL CHART =================
+
+def generate_chart(btc_change, eth_change, sol_change):
+
+    coins = ["BTC", "ETH", "SOL"]
+    changes = [btc_change, eth_change, sol_change]
+
+    colors = ["green" if c >= 0 else "red" for c in changes]
+
+    plt.figure()
+    bars = plt.bar(coins, changes, color=colors)
+
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            height,
+            f"{height:.2f}%",
+            ha="center",
+            va="bottom"
+        )
+
+    plt.title("Chain Momentum Market Change (%)")
+    plt.ylabel("24H Change (%)")
+    plt.tight_layout()
+
+    filename = "market_chart.png"
+    plt.savefig(filename)
+    plt.close()
+
+    return filename
+
+# ================= SCAN =================
+
+def scan():
+
+    logging.info("=== CHAIN MOMENTUM SCAN ===")
+
+    data = fetch_market_data()
+    if not data:
+        logging.error("No market data")
+        return
+
+    btc_price = data["BTC"]["quote"]["USD"]["price"]
+    btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
+
+    eth_price = data["ETH"]["quote"]["USD"]["price"]
+    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
+
+    sol_price = data["SOL"]["quote"]["USD"]["price"]
+    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
+
+    telegram_message = build_telegram_message(data)
     twitter_message = build_twitter_text(
-    btc_price, btc_change,
-    eth_price, eth_change,
-    sol_price, sol_change
-)
-        
-    image_path = generate_price_chart(data)
+        btc_price, btc_change,
+        eth_price, eth_change,
+        sol_price, sol_change
+    )
 
-    logging.info("Sending Telegram...")
+    image_path = generate_chart(btc_change, eth_change, sol_change)
+
     send_telegram_photo(image_path, telegram_message)
-
-    logging.info("Sending Twitter...")
     post_twitter_with_image(twitter_message, image_path)
 
     logging.info("SCAN FINISHED")
@@ -320,17 +284,12 @@ def scan():
 def home():
     return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
 
-
 @app.route("/run-scan")
 def run_scan():
-    try:
-        scan()
-        return "✅ SCAN EXECUTED", 200
-    except Exception as e:
-        logging.error(f"Scan route error: {e}")
-        return f"Error: {e}", 500
-   
-  # ================= START =================
+    scan()
+    return "✅ SCAN EXECUTED", 200
+
+# ================= START =================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
