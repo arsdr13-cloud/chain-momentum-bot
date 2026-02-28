@@ -42,6 +42,38 @@ def send_telegram_photo(photo_path, caption):
     except Exception as e:
         logging.error(f"Telegram error: {e}")
 
+
+# ==============================
+# TWITTER PREMIUM FORMAT
+# ==============================
+
+def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
+    news = fetch_latest_news()
+
+    # Safety: kalau news kosong
+    if news:
+        first_headline = news.split("\n")[0]
+    else:
+        first_headline = "No major crypto headlines today."
+
+    tweet_text = f"""🚀 CHAIN MOMENTUM UPDATE
+
+BTC: ${btc_price} ({btc_change}%)
+ETH: ${eth_price} ({eth_change}%)
+SOL: ${sol_price} ({sol_change}%)
+
+📰 {first_headline}
+
+Stay Ahead. Trade Smart.
+
+#Crypto #BTC #ETH #SOL"""
+
+    # Batasi maksimal 280 karakter (safe 275)
+    if len(tweet_text) > 275:
+        tweet_text = tweet_text[:272] + "..."
+
+    return tweet_text
+
 # ================= TWITTER =================
 
 def post_twitter_with_image(message, image_path):
@@ -204,6 +236,32 @@ def build_premium_message(data):
 
     return message
 
+# ================= BUILD TWITTER =================
+def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
+    news = fetch_latest_news()
+
+    if news:
+        first_headline = news.split("\n")[0]
+    else:
+        first_headline = "No major crypto headlines today."
+
+    tweet_text = f"""🚀 CHAIN MOMENTUM UPDATE
+
+BTC: ${btc_price:,.0f} ({btc_change:.2f}%)
+ETH: ${eth_price:,.0f} ({eth_change:.2f}%)
+SOL: ${sol_price:,.0f} ({sol_change:.2f}%)
+
+📰 {first_headline}
+
+Stay Ahead. Trade Smart.
+
+#Crypto #BTC #ETH #SOL"""
+
+    if len(tweet_text) > 275:
+        tweet_text = tweet_text[:272] + "..."
+
+    return tweet_text
+
 # ================= SCAN =================
 
 def scan():
@@ -221,11 +279,17 @@ def scan():
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
 
-    twitter_message = (
-        f"BTC ${btc_price:,.0f} ({btc_change:.2f}%)\n"
-        "#Crypto #BTC #ETH #SOL"
-    )
+    eth_price = data["ETH"]["quote"]["USD"]["price"]
+    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
 
+    sol_price = data["SOL"]["quote"]["USD"]["price"]
+    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
+    twitter_message = build_twitter_text(
+    btc_price, btc_change,
+    eth_price, eth_change,
+    sol_price, sol_change
+)
+        
     image_path = generate_price_chart(data)
 
     logging.info("Sending Telegram...")
