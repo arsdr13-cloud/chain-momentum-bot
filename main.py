@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from flask import Flask
 import tweepy
 from datetime import datetime
+import numpy as np
+import matplotlib.patches as patches
+from matplotlib.patches import FancyBboxPatch
 
 # ================= CONFIG =================
 
@@ -219,31 +222,125 @@ def generate_chart(btc_change, eth_change, sol_change):
 
     coins = ["BTC", "ETH", "SOL"]
     changes = [btc_change, eth_change, sol_change]
-    colors = ["#00C853" if c >= 0 else "#D50000" for c in changes]
 
-    plt.figure(figsize=(8,5), facecolor="#111111")
-    ax = plt.gca()
-    ax.set_facecolor("#111111")
+    avg_change = sum(changes) / 3
+    sentiment_label, _ = detect_market_sentiment(avg_change)
 
-    bars = plt.bar(coins, changes, color=colors)
+    # ===== FIGURE SETUP =====
+    fig, ax = plt.subplots(figsize=(9,6))
+    fig.patch.set_facecolor("#0b0f1a")
+    ax.set_facecolor("#0b0f1a")
 
-    for bar in bars:
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width()/2,
-            height,
-            f"{height:.2f}%",
+    # ===== NEON GRADIENT BACKGROUND =====
+    gradient = np.linspace(0,1,256)
+    gradient = np.vstack((gradient,gradient))
+    ax.imshow(gradient, aspect='auto', extent=[-1,3,-15,15], cmap="magma", alpha=0.15)
+
+    # ===== ROUNDED BARS + SHADOW =====
+    for i, value in enumerate(changes):
+
+        color = "#00F5A0" if value >= 0 else "#FF2E63"
+
+        # Drop shadow
+        shadow = FancyBboxPatch(
+            (i-0.3, 0),
+            0.6,
+            value,
+            boxstyle="round,pad=0.02",
+            linewidth=0,
+            facecolor="black",
+            alpha=0.4
+        )
+        ax.add_patch(shadow)
+
+        # Main rounded bar
+        bar = FancyBboxPatch(
+            (i-0.3, 0),
+            0.6,
+            value,
+            boxstyle="round,pad=0.02",
+            linewidth=0,
+            facecolor=color
+        )
+        ax.add_patch(bar)
+
+        # Trend Arrow
+        arrow = "↑" if value >= 0 else "↓"
+
+        ax.text(
+            i,
+            value,
+            f"{arrow} {value:.2f}%",
             ha="center",
-            va="bottom",
+            va="bottom" if value >= 0 else "top",
+            fontsize=13,
+            fontweight="bold",
             color="white"
         )
 
-    plt.axhline(0, color="white", linewidth=1)
-    plt.title("CHAIN MOMENTUM | 24H CHANGE", color="white")
+    # ===== FEAR & GREED GAUGE =====
+    gauge_value = max(min((avg_change + 10) * 5, 100), 0)
+
+    ax.text(
+        1,
+        12,
+        f"Fear & Greed: {int(gauge_value)}",
+        ha="center",
+        fontsize=12,
+        color="white",
+        fontweight="bold"
+    )
+
+    # ===== SENTIMENT BADGE =====
+    ax.text(
+        1,
+        10,
+        sentiment_label,
+        ha="center",
+        fontsize=11,
+        bbox=dict(
+            boxstyle="round",
+            facecolor="#1f4068",
+            edgecolor="white",
+            alpha=0.8
+        ),
+        color="white"
+    )
+
+    # ===== TITLE =====
+    ax.set_title(
+        "CHAIN MOMENTUM | MARKET INTELLIGENCE",
+        fontsize=15,
+        color="white",
+        fontweight="bold"
+    )
+
+    ax.set_xticks(range(len(coins)))
+    ax.set_xticklabels(coins, color="white", fontsize=12)
+
+    ax.axhline(0, color="white", alpha=0.3)
+
+    ax.set_yticks([])
+    ax.set_xlim(-1,2)
+    ax.set_ylim(-15,15)
+
+    # ===== SOFT VIGNETTE EFFECT =====
+    vignette = np.outer(np.linspace(0,1,400), np.linspace(0,1,400))
+    ax.imshow(vignette, extent=[-1,2,-15,15], cmap="gray", alpha=0.15)
+
+    # ===== WATERMARK =====
+    ax.text(
+        1.9,
+        -14,
+        "ChainMomentum",
+        fontsize=9,
+        color="white",
+        alpha=0.2
+    )
 
     plt.tight_layout()
     filename = "market_chart.png"
-    plt.savefig(filename, facecolor="#111111")
+    plt.savefig(filename, facecolor="#0b0f1a")
     plt.close()
 
     return filename
