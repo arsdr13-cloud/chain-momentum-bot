@@ -16,7 +16,10 @@ TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
 TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
-
+print("TW_API_KEY:", TW_API_KEY)
+print("TW_ACCESS_TOKEN:", TW_ACCESS_TOKEN)
+print("TW_API_SECRET:", TW_API_SECRET)
+print("TW_ACCESS_SECRET:", TW_ACCESS_SECRET)
 COINS = ["BTC", "ETH", "SOL"]
 
 logging.basicConfig(level=logging.INFO)
