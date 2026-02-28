@@ -164,7 +164,6 @@ BTC Dominance: {btc_dominance:.2f}%
 
 Are smart money accumulating here — or distributing?
 
-❤️ Like | 🔁 Repost | ➕ Follow
 #Crypto #BTC #ETH #SOL
 """
 
