@@ -237,13 +237,15 @@ def build_premium_message(data):
     return message
 
 # ================= BUILD TWITTER =================
+
 def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change):
+
     news = fetch_latest_news()
 
     if news:
         first_headline = news.split("\n")[0]
     else:
-        first_headline = "No major crypto headlines today." 
+        first_headline = "No major crypto headlines today."
 
     tweet_text = f"""🚀 CHAIN MOMENTUM UPDATE
 
