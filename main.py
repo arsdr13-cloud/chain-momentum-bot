@@ -45,6 +45,18 @@ def send_telegram_photo(photo_path, caption):
 
 def post_twitter_with_image(message, image_path):
     try:
+        media = api_v1.media_upload(image_path)
+
+        client.create_tweet(
+            text=message,
+            media_ids=[media.media_id]
+        )
+
+        logging.info("Tweet posted successfully")
+
+    except Exception as e:
+        logging.error(f"Twitter error: {e}")
+    try:
         auth = tweepy.OAuth1UserHandler(
             TW_API_KEY,
             TW_API_SECRET,
@@ -61,15 +73,7 @@ def post_twitter_with_image(message, image_path):
             access_token_secret=TW_ACCESS_SECRET
         )
 
-        client.create_tweet(
-            text=message,
-            media_ids=[media.media_id]
-        )
-
-        logging.info("Tweet posted successfully")
-
-    except Exception as e:
-        logging.error(f"Twitter error: {e}")
+        
 
 # ================= MARKET DATA =================
 
