@@ -242,19 +242,19 @@ def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, 
 
     news = fetch_latest_news()
 
-    if news and news.strip():
-        lines = news.strip().split("\n")
+if news and news.strip():
+    lines = news.strip().split("\n")
 
-        first_headline = ""
-        for line in lines:
-    if line.startswith("•"):
-        first_headline = line.replace("• ", "")
-        break
+    first_headline = ""
+    for line in lines:
+        if line.startswith("•"):
+            first_headline = line.replace("• ", "")
+            break
 
     if not first_headline:
         first_headline = "No major crypto headlines today."
-    else:
-        first_headline = "No major crypto headlines today."
+else:
+    first_headline = "No major crypto headlines today."
 
     tweet_text = f"""🚀 CHAIN MOMENTUM UPDATE
 
