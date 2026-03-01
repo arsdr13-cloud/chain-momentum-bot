@@ -50,7 +50,11 @@ def send_telegram_photo(photo_path, caption):
         with open(photo_path, "rb") as img:
             requests.post(
                 url,
-                data={"chat_id": CHAT_ID, "caption": caption[:1024]},
+                data={
+                    "chat_id": CHAT_ID,
+                    "caption": caption[:1024],
+                    "parse_mode": "HTML"   # 🔥 TAMBAHKAN DI SINI
+                },
                 files={"photo": img},
                 timeout=20
             )
@@ -242,50 +246,60 @@ Are smart money accumulating here — or distributing?
 
 # ================= BUILD TELEGRAM MESSAGE =================
 
-def build_telegram_message(data, btc_dom, eth_dom, sol_dom):
+def build_telegram_message(
+    btc_price, btc_change,
+    eth_price, eth_change,
+    sol_price, sol_change,
+    btc_dom, eth_dom, sol_dom
+):
 
-    now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
-
-    btc_price = data["BTC"]["quote"]["USD"]["price"]
-    btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
-
-    eth_price = data["ETH"]["quote"]["USD"]["price"]
-    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
-
-    sol_price = data["SOL"]["quote"]["USD"]["price"]
-    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
+    from datetime import datetime
 
     avg_change = (btc_change + eth_change + sol_change) / 3
     sentiment, insight = detect_market_sentiment(avg_change)
 
-    headline = fetch_latest_news()
+    # Altseason Detector
+    if btc_dom < 50:
+        alt_signal = "🟢 ALTSEASON MODE"
+    elif btc_dom > 60:
+        alt_signal = "🔵 BTC DOMINANCE PHASE"
+    else:
+        alt_signal = "🟡 ROTATION ZONE"
 
-    message = f"""🚀 CHAIN MOMENTUM REPORT
+    telegram_message = f"""
+🚀 <b>CHAIN MOMENTUM | INSTITUTIONAL REPORT</b>
 ━━━━━━━━━━━━━━━━━━
-🕒 {now}
 
-💰 BTC : ${btc_price:,.0f} ({btc_change:.2f}%)
-💰 ETH : ${eth_price:,.0f} ({eth_change:.2f}%)
-💰 SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
+🕒 <i>{datetime.utcnow().strftime('%d %b %Y | %H:%M UTC')}</i>
+
+💰 <b>BTC</b>  ${btc_price:,.0f}  ({btc_change:.2f}%)
+💰 <b>ETH</b>  ${eth_price:,.0f}  ({eth_change:.2f}%)
+💰 <b>SOL</b>  ${sol_price:,.0f}  ({sol_change:.2f}%)
 
 ━━━━━━━━━━━━━━━━━━
-📊 Market Dominance
+
+📊 <b>Market Dominance</b>
 BTC : {btc_dom:.2f}%
 ETH : {eth_dom:.2f}%
 SOL : {sol_dom:.2f}%
-📈 Market Sentiment : {sentiment}
 
-🧠 Insight :
+━━━━━━━━━━━━━━━━━━
+
+📈 <b>Market Sentiment</b>
+{sentiment}
+
+🧠 <b>Insight</b>
 {insight}
 
 ━━━━━━━━━━━━━━━━━━
-📰 Top Headline :
-{headline}
 
-Stay Ahead. Trade Smart.
+⚡ <b>Regime Detector:</b> {alt_signal}
+
+━━━━━━━━━━━━━━━━━━
+<b>Stay Ahead. Trade Smart.</b>
 """
 
-    return message
+    return telegram_message
 
 # ================= CHART =================
 
