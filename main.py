@@ -232,7 +232,17 @@ def generate_chart(btc_change, eth_change, sol_change):
     fig.patch.set_facecolor("#0b0f1a")
     ax.set_facecolor("#0b0f1a")
 
-    # ================= BARS =================
+    # ========= TITLE (lebih atas & ada space) =========
+    fig.text(
+        0.5, 0.95,
+        "CHAIN MOMENTUM | MARKET INTELLIGENCE",
+        ha="center",
+        fontsize=14,
+        color="white",
+        fontweight="bold"
+    )
+
+    # ========= BARS =========
     for i, value in enumerate(changes):
 
         color = "#00F5A0" if value >= 0 else "#FF2E63"
@@ -262,10 +272,10 @@ def generate_chart(btc_change, eth_change, sol_change):
             zorder=4
         )
 
-    # ================= COMPACT GAUGE =================
+    # ========= CLEAN COMPACT GAUGE =========
     center_x = 1
-    center_y = 14
-    radius = 2.2   # lebih kecil supaya tidak melebar
+    center_y = 12.5     # lebih turun
+    radius = 1.8        # lebih kecil
 
     segments = [
         (0, 25, "#ff2e63"),
@@ -289,17 +299,20 @@ def generate_chart(btc_change, eth_change, sol_change):
         )
         ax.add_patch(wedge)
 
-    inner_circle = patches.Circle(
-        (center_x, center_y),
-        radius * 0.65,
-        color="#0b0f1a",
-        zorder=3
+    # inner circle
+    ax.add_patch(
+        patches.Circle(
+            (center_x, center_y),
+            radius * 0.65,
+            color="#0b0f1a",
+            zorder=3
+        )
     )
-    ax.add_patch(inner_circle)
 
+    # needle (lebih pendek)
     needle_angle = 180 - (gauge_value * 1.8)
-    needle_x = center_x + radius * 0.85 * np.cos(np.radians(needle_angle))
-    needle_y = center_y + radius * 0.85 * np.sin(np.radians(needle_angle))
+    needle_x = center_x + radius * 0.7 * np.cos(np.radians(needle_angle))
+    needle_y = center_y + radius * 0.7 * np.sin(np.radians(needle_angle))
 
     ax.plot(
         [center_x, needle_x],
@@ -310,58 +323,49 @@ def generate_chart(btc_change, eth_change, sol_change):
     )
 
     ax.add_patch(
-        patches.Circle((center_x, center_y), 0.1, color="white", zorder=5)
+        patches.Circle((center_x, center_y), 0.08, color="white", zorder=5)
     )
 
     ax.text(
         center_x,
-        center_y - 0.9,
+        center_y - 0.6,
         f"{int(gauge_value)}",
         ha="center",
-        fontsize=15,
+        fontsize=14,
         fontweight="bold",
-        color="white",
-        zorder=5
+        color="white"
     )
 
     ax.text(
         center_x,
-        center_y - 1.6,
+        center_y - 1.2,
         "Fear & Greed Index",
         ha="center",
         fontsize=8,
         color="white",
-        alpha=0.8,
-        zorder=5
+        alpha=0.7
     )
 
-    # ================= TITLE =================
-    ax.set_title(
-        "CHAIN MOMENTUM | MARKET INTELLIGENCE",
-        fontsize=15,
-        color="white",
-        fontweight="bold"
-    )
-
+    # ========= AXIS SETTINGS =========
     ax.set_xticks(range(len(coins)))
-    ax.set_xticklabels(coins, color="white", fontsize=12)
+    ax.set_xticklabels(coins, color="white", fontsize=11)
 
     ax.axhline(0, color="white", alpha=0.3)
 
     ax.set_yticks([])
     ax.set_xlim(-1,2)
-    ax.set_ylim(-10,18)
+    ax.set_ylim(-10,15)
 
     ax.text(
         1.9,
         -9,
         "ChainMomentum",
-        fontsize=9,
+        fontsize=8,
         color="white",
         alpha=0.2
     )
 
-    plt.tight_layout()
+    plt.subplots_adjust(top=0.88)   # kasih jarak atas
     filename = "market_chart.png"
     plt.savefig(filename, facecolor="#0b0f1a")
     plt.close()
