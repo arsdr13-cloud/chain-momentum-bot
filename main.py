@@ -232,7 +232,7 @@ def generate_chart(btc_change, eth_change, sol_change):
     fig.patch.set_facecolor("#0b0f1a")
     ax.set_facecolor("#0b0f1a")
 
-    # ===== BAR SECTION (BAWAH) =====
+    # ================= BARS =================
     for i, value in enumerate(changes):
 
         color = "#00F5A0" if value >= 0 else "#FF2E63"
@@ -256,16 +256,16 @@ def generate_chart(btc_change, eth_change, sol_change):
             f"{arrow} {value:.2f}%",
             ha="center",
             va="bottom" if value >= 0 else "top",
-            fontsize=12,
+            fontsize=11,
             fontweight="bold",
             color="white",
             zorder=4
         )
 
-    # ===== GAUGE SECTION (ATAS) =====
+    # ================= COMPACT GAUGE =================
     center_x = 1
-    center_y = 13   # DIGESER KE ATAS
-    radius = 2.8
+    center_y = 14
+    radius = 2.2   # lebih kecil supaya tidak melebar
 
     segments = [
         (0, 25, "#ff2e63"),
@@ -298,8 +298,8 @@ def generate_chart(btc_change, eth_change, sol_change):
     ax.add_patch(inner_circle)
 
     needle_angle = 180 - (gauge_value * 1.8)
-    needle_x = center_x + radius * 0.9 * np.cos(np.radians(needle_angle))
-    needle_y = center_y + radius * 0.9 * np.sin(np.radians(needle_angle))
+    needle_x = center_x + radius * 0.85 * np.cos(np.radians(needle_angle))
+    needle_y = center_y + radius * 0.85 * np.sin(np.radians(needle_angle))
 
     ax.plot(
         [center_x, needle_x],
@@ -310,15 +310,15 @@ def generate_chart(btc_change, eth_change, sol_change):
     )
 
     ax.add_patch(
-        patches.Circle((center_x, center_y), 0.12, color="white", zorder=5)
+        patches.Circle((center_x, center_y), 0.1, color="white", zorder=5)
     )
 
     ax.text(
         center_x,
-        center_y - 1,
+        center_y - 0.9,
         f"{int(gauge_value)}",
         ha="center",
-        fontsize=16,
+        fontsize=15,
         fontweight="bold",
         color="white",
         zorder=5
@@ -326,7 +326,7 @@ def generate_chart(btc_change, eth_change, sol_change):
 
     ax.text(
         center_x,
-        center_y - 1.8,
+        center_y - 1.6,
         "Fear & Greed Index",
         ha="center",
         fontsize=8,
@@ -335,7 +335,7 @@ def generate_chart(btc_change, eth_change, sol_change):
         zorder=5
     )
 
-    # ===== TITLE =====
+    # ================= TITLE =================
     ax.set_title(
         "CHAIN MOMENTUM | MARKET INTELLIGENCE",
         fontsize=15,
@@ -350,7 +350,7 @@ def generate_chart(btc_change, eth_change, sol_change):
 
     ax.set_yticks([])
     ax.set_xlim(-1,2)
-    ax.set_ylim(-10,18)   # DIPERLEBAR
+    ax.set_ylim(-10,18)
 
     ax.text(
         1.9,
