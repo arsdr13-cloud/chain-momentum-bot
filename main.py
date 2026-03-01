@@ -226,9 +226,9 @@ ETH ${eth_price:,.0f} ({eth_change:.2f}%)
 SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
 Market Dominance
-btc_dom = fetch_btc_dominance() or 0
-eth_dom = fetch_eth_dominance() or 0
-sol_dom = fetch_sol_dominance() or 0
+BTC: {btc_dominance:.2f}%
+ETH: {eth_dominance:.2f}%
+SOL: {sol_dominance:.2f}%
 
 {sentiment}
 {insight}
@@ -329,7 +329,9 @@ def scan():
     if not data:
         return
 
-    btc_dominance = fetch_btc_dominance() or 0
+    btc_dom = fetch_btc_dominance() or 0
+    eth_dom = fetch_eth_dominance() or 0
+    sol_dom = fetch_sol_dominance() or 0
 
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
@@ -340,13 +342,15 @@ def scan():
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
-    telegram_message = build_telegram_message(data, btc_dominance)
+    telegram_message = build_telegram_message(data, btc_dom)
     twitter_message = build_twitter_text(
-        btc_price, btc_change,
-        eth_price, eth_change,
-        sol_price, sol_change,
-        btc_dominance
-    )
+    btc_price, btc_change,
+    eth_price, eth_change,
+    sol_price, sol_change,
+    btc_dom,
+    eth_dom,
+    sol_dom
+)
 
     image_path = generate_chart(btc_change, eth_change, sol_change)
 
