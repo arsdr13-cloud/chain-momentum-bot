@@ -4,7 +4,7 @@ import requests
 import matplotlib.pyplot as plt
 from flask import Flask
 import tweepy
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ================= CONFIG =================
 
@@ -22,6 +22,20 @@ COINS = ["BTC", "ETH", "SOL"]
 
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
+
+# ================= INSTITUTIONAL UTC TIMING =================
+
+INSTITUTIONAL_HOURS_UTC = [
+    0,   # Asia Open
+    8,   # London Open
+    13,  # NY Pre-Market
+    14,  # NY Open
+    20   # NY Close
+]
+
+def is_institutional_time():
+    now = datetime.now(timezone.utc)
+    return now.hour in INSTITUTIONAL_HOURS_UTC
 
 # ================= TWITTER CLIENT =================
 
@@ -53,7 +67,7 @@ def send_telegram_photo(photo_path, caption):
                 data={
                     "chat_id": CHAT_ID,
                     "caption": caption[:1024],
-                    "parse_mode": "HTML"   # 🔥 TAMBAHKAN DI SINI
+                    "parse_mode": "HTML"
                 },
                 files={"photo": img},
                 timeout=20
@@ -126,11 +140,8 @@ def fetch_eth_dominance():
             return None
 
         data = r.json()["data"]
-
         total_market_cap = data["quote"]["USD"]["total_market_cap"]
-        eth_market_cap = data["quote"]["USD"]["altcoin_market_cap"] * 0  # placeholder
 
-        # Cara lebih akurat: ambil langsung dari cryptocurrency/quotes
         url2 = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
         params = {"symbol": "ETH"}
         r2 = requests.get(url2, headers=headers, params=params, timeout=20)
@@ -175,26 +186,6 @@ def fetch_sol_dominance():
     except:
         return None
 
-# ================= NEWS =================
-
-def fetch_latest_news():
-    try:
-        url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
-        r = requests.get(url, timeout=20)
-
-        if r.status_code != 200:
-            return "No major crypto headlines today."
-
-        data = r.json()
-        for article in data.get("Data", []):
-            title = article.get("title", "")
-            if title:
-                return title
-
-        return "No major crypto headlines today."
-    except:
-        return "No major crypto headlines today."
-
 # ================= SENTIMENT ENGINE =================
 
 def detect_market_sentiment(avg_change):
@@ -209,41 +200,6 @@ def detect_market_sentiment(avg_change):
     else:
         return "🚀 Strong Risk-On", "Expansion phase active. Breakout watch."
 
-# ================= BUILD TWITTER TEXT =================
-
-def build_twitter_text(
-    btc_price, btc_change,
-    eth_price, eth_change,
-    sol_price, sol_change,
-    btc_dominance,
-    eth_dominance,
-    sol_dominance
-):
-
-    avg_change = (btc_change + eth_change + sol_change) / 3
-    sentiment, insight = detect_market_sentiment(avg_change)
-
-    tweet_text = f"""🚨 Market Update
-
-BTC ${btc_price:,.0f} ({btc_change:.2f}%)
-ETH ${eth_price:,.0f} ({eth_change:.2f}%)
-SOL ${sol_price:,.0f} ({sol_change:.2f}%)
-
-Market Dominance
-BTC: {btc_dominance:.2f}%
-ETH: {eth_dominance:.2f}%
-SOL: {sol_dominance:.2f}%
-
-{sentiment}
-{insight}
-
-Are smart money accumulating here — or distributing?
-
-#Crypto #BTC #ETH #SOL
-"""
-
-    return tweet_text[:280]
-
 # ================= BUILD TELEGRAM MESSAGE =================
 
 def build_telegram_message(
@@ -253,24 +209,14 @@ def build_telegram_message(
     btc_dom, eth_dom, sol_dom
 ):
 
-    from datetime import datetime
-
     avg_change = (btc_change + eth_change + sol_change) / 3
     sentiment, insight = detect_market_sentiment(avg_change)
-
-    # Altseason Detector
-    if btc_dom < 50:
-        alt_signal = "🟢 ALTSEASON MODE"
-    elif btc_dom > 60:
-        alt_signal = "🔵 BTC DOMINANCE PHASE"
-    else:
-        alt_signal = "🟡 ROTATION ZONE"
 
     telegram_message = f"""
 🚀 <b>CHAIN MOMENTUM | INSTITUTIONAL REPORT</b>
 ━━━━━━━━━━━━━━━━━━
 
-🕒 <i>{datetime.utcnow().strftime('%d %b %Y | %H:%M UTC')}</i>
+🕒 <i>{datetime.now(timezone.utc).strftime('%d %b %Y | %H:%M UTC')}</i>
 
 💰 <b>BTC</b>  ${btc_price:,.0f}  ({btc_change:.2f}%)
 💰 <b>ETH</b>  ${eth_price:,.0f}  ({eth_change:.2f}%)
@@ -292,55 +238,21 @@ SOL : {sol_dom:.2f}%
 {insight}
 
 ━━━━━━━━━━━━━━━━━━
-
-⚡ <b>Regime Detector:</b> {alt_signal}
-
-━━━━━━━━━━━━━━━━━━
 <b>Stay Ahead. Trade Smart.</b>
 """
 
     return telegram_message
-
-# ================= CHART =================
-
-def generate_chart(btc_change, eth_change, sol_change):
-
-    coins = ["BTC", "ETH", "SOL"]
-    changes = [btc_change, eth_change, sol_change]
-    colors = ["#00C853" if c >= 0 else "#D50000" for c in changes]
-
-    plt.figure(figsize=(8,5), facecolor="#111111")
-    ax = plt.gca()
-    ax.set_facecolor("#111111")
-
-    bars = plt.bar(coins, changes, color=colors)
-
-    for bar in bars:
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width()/2,
-            height,
-            f"{height:.2f}%",
-            ha="center",
-            va="bottom",
-            color="white"
-        )
-
-    plt.axhline(0, color="white", linewidth=1)
-    plt.title("CHAIN MOMENTUM | 24H CHANGE", color="white")
-
-    plt.tight_layout()
-    filename = "market_chart.png"
-    plt.savefig(filename, facecolor="#111111")
-    plt.close()
-
-    return filename
 
 # ================= SCAN =================
 
 def scan():
 
     logging.info("=== CHAIN MOMENTUM SCAN ===")
+
+    # 🔥 Institutional UTC Filter
+    if not is_institutional_time():
+        logging.info("Not institutional UTC hour. Scan skipped.")
+        return
 
     data = fetch_market_data()
     if not data:
@@ -360,24 +272,14 @@ def scan():
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
     telegram_message = build_telegram_message(
-    btc_price, btc_change,
-    eth_price, eth_change,
-    sol_price, sol_change,
-    btc_dom, eth_dom, sol_dom
-)
-    twitter_message = build_twitter_text(
-    btc_price, btc_change,
-    eth_price, eth_change,
-    sol_price, sol_change,
-    btc_dom,
-    eth_dom,
-    sol_dom
-)
+        btc_price, btc_change,
+        eth_price, eth_change,
+        sol_price, sol_change,
+        btc_dom, eth_dom, sol_dom
+    )
 
-    image_path = generate_chart(btc_change, eth_change, sol_change)
-
+    image_path = "market_chart.png"
     send_telegram_photo(image_path, telegram_message)
-    post_twitter_with_image(twitter_message, image_path)
 
     logging.info("SCAN FINISHED")
 
