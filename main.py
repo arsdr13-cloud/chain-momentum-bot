@@ -226,9 +226,9 @@ ETH ${eth_price:,.0f} ({eth_change:.2f}%)
 SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
 Market Dominance
-BTC: {btc_dominance:.2f}%
-ETH: {eth_dominance:.2f}%
-SOL: {sol_dominance:.2f}%
+btc_dom = fetch_btc_dominance() or 0
+eth_dom = fetch_eth_dominance() or 0
+sol_dom = fetch_sol_dominance() or 0
 
 {sentiment}
 {insight}
