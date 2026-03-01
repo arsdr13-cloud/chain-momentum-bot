@@ -226,22 +226,19 @@ def generate_chart(btc_change, eth_change, sol_change):
     avg_change = sum(changes) / 3
     sentiment_label, _ = detect_market_sentiment(avg_change)
 
+    # ===== CONVERT AVG CHANGE TO 0-100 SCALE =====
+    gauge_value = max(min((avg_change + 10) * 5, 100), 0)
+
     # ===== FIGURE SETUP =====
     fig, ax = plt.subplots(figsize=(9,6))
     fig.patch.set_facecolor("#0b0f1a")
     ax.set_facecolor("#0b0f1a")
 
-    # ===== NEON GRADIENT BACKGROUND =====
-    gradient = np.linspace(0,1,256)
-    gradient = np.vstack((gradient,gradient))
-    ax.imshow(gradient, aspect='auto', extent=[-1,3,-15,15], cmap="magma", alpha=0.15)
-
-    # ===== ROUNDED BARS + SHADOW =====
+    # ===== BAR SECTION =====
     for i, value in enumerate(changes):
 
         color = "#00F5A0" if value >= 0 else "#FF2E63"
 
-        # Drop shadow
         shadow = FancyBboxPatch(
             (i-0.3, 0),
             0.6,
@@ -253,7 +250,6 @@ def generate_chart(btc_change, eth_change, sol_change):
         )
         ax.add_patch(shadow)
 
-        # Main rounded bar
         bar = FancyBboxPatch(
             (i-0.3, 0),
             0.6,
@@ -264,7 +260,6 @@ def generate_chart(btc_change, eth_change, sol_change):
         )
         ax.add_patch(bar)
 
-        # Trend Arrow
         arrow = "↑" if value >= 0 else "↓"
 
         ax.text(
@@ -278,33 +273,76 @@ def generate_chart(btc_change, eth_change, sol_change):
             color="white"
         )
 
-    # ===== FEAR & GREED GAUGE =====
-    gauge_value = max(min((avg_change + 10) * 5, 100), 0)
+    # ===== CIRCULAR FEAR & GREED DIAL =====
+    center_x = 1
+    center_y = 9
+    radius = 3
 
-    ax.text(
-        1,
-        12,
-        f"Fear & Greed: {int(gauge_value)}",
-        ha="center",
-        fontsize=12,
+    # Color segments
+    segments = [
+        (0, 25, "#ff2e63"),      # Extreme Fear
+        (25, 45, "#ff7a00"),     # Fear
+        (45, 55, "#ffd000"),     # Neutral
+        (55, 75, "#9acd32"),     # Greed
+        (75, 100, "#00F5A0")     # Extreme Greed
+    ]
+
+    for start, end, color in segments:
+        theta1 = 180 - (start * 1.8)
+        theta2 = 180 - (end * 1.8)
+        wedge = patches.Wedge(
+            (center_x, center_y),
+            radius,
+            theta2,
+            theta1,
+            facecolor=color,
+            edgecolor=None
+        )
+        ax.add_patch(wedge)
+
+    # Inner circle (to make it dial style)
+    inner_circle = patches.Circle(
+        (center_x, center_y),
+        radius * 0.65,
+        color="#0b0f1a"
+    )
+    ax.add_patch(inner_circle)
+
+    # Needle
+    needle_angle = 180 - (gauge_value * 1.8)
+    needle_x = center_x + radius * 0.9 * np.cos(np.radians(needle_angle))
+    needle_y = center_y + radius * 0.9 * np.sin(np.radians(needle_angle))
+
+    ax.plot(
+        [center_x, needle_x],
+        [center_y, needle_y],
         color="white",
-        fontweight="bold"
+        linewidth=2
     )
 
-    # ===== SENTIMENT BADGE =====
+    ax.add_patch(
+        patches.Circle((center_x, center_y), 0.15, color="white")
+    )
+
+    # Gauge Text
     ax.text(
-        1,
-        10,
-        sentiment_label,
+        center_x,
+        center_y - 1.2,
+        f"{int(gauge_value)}",
         ha="center",
-        fontsize=11,
-        bbox=dict(
-            boxstyle="round",
-            facecolor="#1f4068",
-            edgecolor="white",
-            alpha=0.8
-        ),
+        fontsize=18,
+        fontweight="bold",
         color="white"
+    )
+
+    ax.text(
+        center_x,
+        center_y - 2,
+        "Fear & Greed Index",
+        ha="center",
+        fontsize=9,
+        color="white",
+        alpha=0.8
     )
 
     # ===== TITLE =====
@@ -324,11 +362,6 @@ def generate_chart(btc_change, eth_change, sol_change):
     ax.set_xlim(-1,2)
     ax.set_ylim(-15,15)
 
-    # ===== SOFT VIGNETTE EFFECT =====
-    vignette = np.outer(np.linspace(0,1,400), np.linspace(0,1,400))
-    ax.imshow(vignette, extent=[-1,2,-15,15], cmap="gray", alpha=0.15)
-
-    # ===== WATERMARK =====
     ax.text(
         1.9,
         -14,
