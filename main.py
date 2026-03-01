@@ -226,29 +226,16 @@ def generate_chart(btc_change, eth_change, sol_change):
     avg_change = sum(changes) / 3
     sentiment_label, _ = detect_market_sentiment(avg_change)
 
-    # ===== CONVERT AVG CHANGE TO 0-100 SCALE =====
     gauge_value = max(min((avg_change + 10) * 5, 100), 0)
 
-    # ===== FIGURE SETUP =====
     fig, ax = plt.subplots(figsize=(9,6))
     fig.patch.set_facecolor("#0b0f1a")
     ax.set_facecolor("#0b0f1a")
 
-    # ===== BAR SECTION =====
+    # ===== BAR SECTION (BAWAH) =====
     for i, value in enumerate(changes):
 
         color = "#00F5A0" if value >= 0 else "#FF2E63"
-
-        shadow = FancyBboxPatch(
-            (i-0.3, 0),
-            0.6,
-            value,
-            boxstyle="round,pad=0.02",
-            linewidth=0,
-            facecolor="black",
-            alpha=0.4
-        )
-        ax.add_patch(shadow)
 
         bar = FancyBboxPatch(
             (i-0.3, 0),
@@ -256,7 +243,8 @@ def generate_chart(btc_change, eth_change, sol_change):
             value,
             boxstyle="round,pad=0.02",
             linewidth=0,
-            facecolor=color
+            facecolor=color,
+            zorder=3
         )
         ax.add_patch(bar)
 
@@ -264,27 +252,27 @@ def generate_chart(btc_change, eth_change, sol_change):
 
         ax.text(
             i,
-            value,
+            value + (0.5 if value >= 0 else -0.5),
             f"{arrow} {value:.2f}%",
             ha="center",
             va="bottom" if value >= 0 else "top",
-            fontsize=13,
+            fontsize=12,
             fontweight="bold",
-            color="white"
+            color="white",
+            zorder=4
         )
 
-    # ===== CIRCULAR FEAR & GREED DIAL =====
+    # ===== GAUGE SECTION (ATAS) =====
     center_x = 1
-    center_y = 9
-    radius = 3
+    center_y = 13   # DIGESER KE ATAS
+    radius = 2.8
 
-    # Color segments
     segments = [
-        (0, 25, "#ff2e63"),      # Extreme Fear
-        (25, 45, "#ff7a00"),     # Fear
-        (45, 55, "#ffd000"),     # Neutral
-        (55, 75, "#9acd32"),     # Greed
-        (75, 100, "#00F5A0")     # Extreme Greed
+        (0, 25, "#ff2e63"),
+        (25, 45, "#ff7a00"),
+        (45, 55, "#ffd000"),
+        (55, 75, "#9acd32"),
+        (75, 100, "#00F5A0")
     ]
 
     for start, end, color in segments:
@@ -296,19 +284,19 @@ def generate_chart(btc_change, eth_change, sol_change):
             theta2,
             theta1,
             facecolor=color,
-            edgecolor=None
+            edgecolor=None,
+            zorder=2
         )
         ax.add_patch(wedge)
 
-    # Inner circle (to make it dial style)
     inner_circle = patches.Circle(
         (center_x, center_y),
         radius * 0.65,
-        color="#0b0f1a"
+        color="#0b0f1a",
+        zorder=3
     )
     ax.add_patch(inner_circle)
 
-    # Needle
     needle_angle = 180 - (gauge_value * 1.8)
     needle_x = center_x + radius * 0.9 * np.cos(np.radians(needle_angle))
     needle_y = center_y + radius * 0.9 * np.sin(np.radians(needle_angle))
@@ -317,32 +305,34 @@ def generate_chart(btc_change, eth_change, sol_change):
         [center_x, needle_x],
         [center_y, needle_y],
         color="white",
-        linewidth=2
+        linewidth=2,
+        zorder=4
     )
 
     ax.add_patch(
-        patches.Circle((center_x, center_y), 0.15, color="white")
+        patches.Circle((center_x, center_y), 0.12, color="white", zorder=5)
     )
 
-    # Gauge Text
     ax.text(
         center_x,
-        center_y - 1.2,
+        center_y - 1,
         f"{int(gauge_value)}",
         ha="center",
-        fontsize=18,
+        fontsize=16,
         fontweight="bold",
-        color="white"
+        color="white",
+        zorder=5
     )
 
     ax.text(
         center_x,
-        center_y - 2,
+        center_y - 1.8,
         "Fear & Greed Index",
         ha="center",
-        fontsize=9,
+        fontsize=8,
         color="white",
-        alpha=0.8
+        alpha=0.8,
+        zorder=5
     )
 
     # ===== TITLE =====
@@ -360,11 +350,11 @@ def generate_chart(btc_change, eth_change, sol_change):
 
     ax.set_yticks([])
     ax.set_xlim(-1,2)
-    ax.set_ylim(-15,15)
+    ax.set_ylim(-10,18)   # DIPERLEBAR
 
     ax.text(
         1.9,
-        -14,
+        -9,
         "ChainMomentum",
         fontsize=9,
         color="white",
