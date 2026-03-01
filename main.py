@@ -110,6 +110,67 @@ def fetch_btc_dominance():
     except:
         return None
 
+# ================= ETH DOMINANCE =================
+
+def fetch_eth_dominance():
+    try:
+        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
+        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
+
+        r = requests.get(url, headers=headers, timeout=20)
+        if r.status_code != 200:
+            return None
+
+        data = r.json()["data"]
+
+        total_market_cap = data["quote"]["USD"]["total_market_cap"]
+        eth_market_cap = data["quote"]["USD"]["altcoin_market_cap"] * 0  # placeholder
+
+        # Cara lebih akurat: ambil langsung dari cryptocurrency/quotes
+        url2 = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+        params = {"symbol": "ETH"}
+        r2 = requests.get(url2, headers=headers, params=params, timeout=20)
+
+        if r2.status_code != 200:
+            return None
+
+        eth_market_cap = r2.json()["data"]["ETH"]["quote"]["USD"]["market_cap"]
+
+        dominance = (eth_market_cap / total_market_cap) * 100
+        return round(dominance, 2)
+
+    except:
+        return None
+
+# ================= SOL DOMINANCE =================
+
+def fetch_sol_dominance():
+    try:
+        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
+        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
+
+        r = requests.get(url, headers=headers, timeout=20)
+        if r.status_code != 200:
+            return None
+
+        data = r.json()["data"]
+        total_market_cap = data["quote"]["USD"]["total_market_cap"]
+
+        url2 = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+        params = {"symbol": "SOL"}
+        r2 = requests.get(url2, headers=headers, params=params, timeout=20)
+
+        if r2.status_code != 200:
+            return None
+
+        sol_market_cap = r2.json()["data"]["SOL"]["quote"]["USD"]["market_cap"]
+
+        dominance = (sol_market_cap / total_market_cap) * 100
+        return round(dominance, 2)
+
+    except:
+        return None
+
 # ================= NEWS =================
 
 def fetch_latest_news():
@@ -146,7 +207,14 @@ def detect_market_sentiment(avg_change):
 
 # ================= BUILD TWITTER TEXT =================
 
-def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change, btc_dominance):
+def build_twitter_text(
+    btc_price, btc_change,
+    eth_price, eth_change,
+    sol_price, sol_change,
+    btc_dominance,
+    eth_dominance,
+    sol_dominance
+):
 
     avg_change = (btc_change + eth_change + sol_change) / 3
     sentiment, insight = detect_market_sentiment(avg_change)
@@ -157,7 +225,10 @@ BTC ${btc_price:,.0f} ({btc_change:.2f}%)
 ETH ${eth_price:,.0f} ({eth_change:.2f}%)
 SOL ${sol_price:,.0f} ({sol_change:.2f}%)
 
-BTC Dominance: {btc_dominance:.2f}%
+Market Dominance
+BTC: {btc_dominance:.2f}%
+ETH: {eth_dominance:.2f}%
+SOL: {sol_dominance:.2f}%
 
 {sentiment}
 {insight}
