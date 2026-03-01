@@ -360,10 +360,10 @@ def scan():
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
     telegram_message = build_telegram_message(
-    data,
-    btc_dom,
-    eth_dom,
-    sol_dom
+    btc_price, btc_change,
+    eth_price, eth_change,
+    sol_price, sol_change,
+    btc_dom, eth_dom, sol_dom
 )
     twitter_message = build_twitter_text(
     btc_price, btc_change,
