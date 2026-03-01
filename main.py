@@ -6,7 +6,6 @@ from flask import Flask
 import tweepy
 from datetime import datetime
 import numpy as np
-import matplotlib.patches as patches
 from matplotlib.patches import FancyBboxPatch
 
 # ================= CONFIG =================
@@ -61,21 +60,58 @@ def send_telegram_photo(photo_path, caption):
     except Exception as e:
         logging.error(f"Telegram error: {e}")
 
-# ================= TWITTER =================
+# ================= ULTRA CLEAN DIAL =================
 
-def post_twitter_with_image(message, image_path):
-    try:
-        media = api_v1.media_upload(image_path)
+def draw_fear_greed_dial(ax, value):
+    ax.set_facecolor("#0b0f1a")
+    ax.axis("off")
 
-        client.create_tweet(
-            text=message,
-            media_ids=[media.media_id]
-        )
+    theta = np.linspace(np.pi, 2*np.pi, 400)
 
-        logging.info("Tweet posted successfully")
+    # Base arc
+    ax.plot(np.cos(theta), np.sin(theta),
+            lw=12, color="#1e293b",
+            solid_capstyle="round")
 
-    except Exception as e:
-        logging.error(f"Twitter error: {e}")
+    # Active arc
+    active_theta = np.linspace(
+        np.pi,
+        np.pi + (value/100)*np.pi,
+        300
+    )
+
+    ax.plot(np.cos(active_theta),
+            np.sin(active_theta),
+            lw=12,
+            color="#22c55e",
+            solid_capstyle="round")
+
+    # Pointer
+    angle = np.pi + (value/100)*np.pi
+    ax.plot([0, 0.85*np.cos(angle)],
+            [0, 0.85*np.sin(angle)],
+            lw=2,
+            color="white")
+
+    ax.add_artist(plt.Circle((0, 0), 0.06, color="white"))
+
+    ax.text(0, -0.12,
+            f"{int(value)}",
+            ha="center",
+            va="center",
+            fontsize=26,
+            color="white",
+            fontweight="bold")
+
+    ax.text(0, -0.28,
+            "Fear & Greed Index",
+            ha="center",
+            va="center",
+            fontsize=9,
+            color="#94a3b8")
+
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(-1.1, 0.25)
 
 # ================= MARKET DATA =================
 
@@ -86,135 +122,27 @@ def fetch_market_data():
         params = {"symbol": ",".join(COINS), "convert": "USD"}
 
         r = requests.get(url, headers=headers, params=params, timeout=20)
-
         if r.status_code != 200:
-            logging.error(f"CMC error: {r.status_code}")
             return None
 
         return r.json()["data"]
 
-    except Exception as e:
-        logging.error(f"CMC fetch error: {e}")
-        return None
-
-# ================= BTC DOMINANCE =================
-
-def fetch_btc_dominance():
-    try:
-        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
-        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
-        r = requests.get(url, headers=headers, timeout=20)
-
-        if r.status_code != 200:
-            return None
-
-        data = r.json()
-        return data["data"]["btc_dominance"]
     except:
         return None
 
-# ================= NEWS =================
-
-def fetch_latest_news():
-    try:
-        url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
-        r = requests.get(url, timeout=20)
-
-        if r.status_code != 200:
-            return "No major crypto headlines today."
-
-        data = r.json()
-        for article in data.get("Data", []):
-            title = article.get("title", "")
-            if title:
-                return title
-
-        return "No major crypto headlines today."
-    except:
-        return "No major crypto headlines today."
-
-# ================= SENTIMENT ENGINE =================
+# ================= SENTIMENT =================
 
 def detect_market_sentiment(avg_change):
     if avg_change < -5:
-        return "🔴 Extreme Fear", "Distribution phase intensifying. Liquidity risk rising."
+        return "🔴 Extreme Fear"
     elif avg_change < -2:
-        return "🟠 Risk-Off", "Defensive positioning dominates. Institutions cautious."
+        return "🟠 Risk-Off"
     elif avg_change < 0:
-        return "🟡 Neutral-Bearish", "Mild correction. Monitoring structure."
+        return "🟡 Neutral-Bearish"
     elif avg_change < 3:
-        return "🟢 Neutral-Bullish", "Controlled momentum building."
+        return "🟢 Neutral-Bullish"
     else:
-        return "🚀 Strong Risk-On", "Expansion phase active. Breakout watch."
-
-# ================= BUILD TWITTER TEXT =================
-
-def build_twitter_text(btc_price, btc_change, eth_price, eth_change, sol_price, sol_change, btc_dominance):
-
-    avg_change = (btc_change + eth_change + sol_change) / 3
-    sentiment, insight = detect_market_sentiment(avg_change)
-
-    tweet_text = f"""🚨 Market Update
-
-BTC ${btc_price:,.0f} ({btc_change:.2f}%)
-ETH ${eth_price:,.0f} ({eth_change:.2f}%)
-SOL ${sol_price:,.0f} ({sol_change:.2f}%)
-
-BTC Dominance: {btc_dominance:.2f}%
-
-{sentiment}
-{insight}
-
-Are smart money accumulating here — or distributing?
-
-#Crypto #BTC #ETH #SOL
-"""
-
-    return tweet_text[:280]
-
-# ================= BUILD TELEGRAM MESSAGE =================
-
-def build_telegram_message(data, btc_dominance):
-
-    now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
-
-    btc_price = data["BTC"]["quote"]["USD"]["price"]
-    btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
-
-    eth_price = data["ETH"]["quote"]["USD"]["price"]
-    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
-
-    sol_price = data["SOL"]["quote"]["USD"]["price"]
-    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
-
-    avg_change = (btc_change + eth_change + sol_change) / 3
-    sentiment, insight = detect_market_sentiment(avg_change)
-
-    headline = fetch_latest_news()
-
-    message = f"""🚀 CHAIN MOMENTUM REPORT
-━━━━━━━━━━━━━━━━━━
-🕒 {now}
-
-💰 BTC : ${btc_price:,.0f} ({btc_change:.2f}%)
-💰 ETH : ${eth_price:,.0f} ({eth_change:.2f}%)
-💰 SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
-
-━━━━━━━━━━━━━━━━━━
-📊 BTC Dominance : {btc_dominance:.2f}%
-📈 Market Sentiment : {sentiment}
-
-🧠 Insight :
-{insight}
-
-━━━━━━━━━━━━━━━━━━
-📰 Top Headline :
-{headline}
-
-Stay Ahead. Trade Smart.
-"""
-
-    return message
+        return "🚀 Strong Risk-On"
 
 # ================= CHART =================
 
@@ -224,28 +152,19 @@ def generate_chart(btc_change, eth_change, sol_change):
     changes = [btc_change, eth_change, sol_change]
 
     avg_change = sum(changes) / 3
-    sentiment_label, _ = detect_market_sentiment(avg_change)
 
+    # convert to 0-100 clean scale
     gauge_value = max(min((avg_change + 10) * 5, 100), 0)
 
-    fig, ax = plt.subplots(figsize=(9,6))
-    fig.patch.set_facecolor("#0b0f1a")
+    fig = plt.figure(figsize=(10,6), facecolor="#0b0f1a")
+
+    # ========= MAIN BAR AXIS =========
+    ax = fig.add_axes([0.08, 0.12, 0.55, 0.7])
     ax.set_facecolor("#0b0f1a")
 
-    # ========= TITLE (lebih atas & ada space) =========
-    fig.text(
-        0.5, 0.95,
-        "CHAIN MOMENTUM | MARKET INTELLIGENCE",
-        ha="center",
-        fontsize=14,
-        color="white",
-        fontweight="bold"
-    )
-
-    # ========= BARS =========
     for i, value in enumerate(changes):
 
-        color = "#00F5A0" if value >= 0 else "#FF2E63"
+        color = "#22c55e" if value >= 0 else "#ef4444"
 
         bar = FancyBboxPatch(
             (i-0.3, 0),
@@ -253,8 +172,7 @@ def generate_chart(btc_change, eth_change, sol_change):
             value,
             boxstyle="round,pad=0.02",
             linewidth=0,
-            facecolor=color,
-            zorder=3
+            facecolor=color
         )
         ax.add_patch(bar)
 
@@ -268,104 +186,30 @@ def generate_chart(btc_change, eth_change, sol_change):
             va="bottom" if value >= 0 else "top",
             fontsize=11,
             fontweight="bold",
-            color="white",
-            zorder=4
+            color="white"
         )
 
-    # ========= CLEAN COMPACT GAUGE =========
-    center_x = 1
-    center_y = 12.5     # lebih turun
-    radius = 1.8        # lebih kecil
-
-    segments = [
-        (0, 25, "#ff2e63"),
-        (25, 45, "#ff7a00"),
-        (45, 55, "#ffd000"),
-        (55, 75, "#9acd32"),
-        (75, 100, "#00F5A0")
-    ]
-
-    for start, end, color in segments:
-        theta1 = 180 - (start * 1.8)
-        theta2 = 180 - (end * 1.8)
-        wedge = patches.Wedge(
-            (center_x, center_y),
-            radius,
-            theta2,
-            theta1,
-            facecolor=color,
-            edgecolor=None,
-            zorder=2
-        )
-        ax.add_patch(wedge)
-
-    # inner circle
-    ax.add_patch(
-        patches.Circle(
-            (center_x, center_y),
-            radius * 0.65,
-            color="#0b0f1a",
-            zorder=3
-        )
-    )
-
-    # needle (lebih pendek)
-    needle_angle = 180 - (gauge_value * 1.8)
-    needle_x = center_x + radius * 0.7 * np.cos(np.radians(needle_angle))
-    needle_y = center_y + radius * 0.7 * np.sin(np.radians(needle_angle))
-
-    ax.plot(
-        [center_x, needle_x],
-        [center_y, needle_y],
-        color="white",
-        linewidth=2,
-        zorder=4
-    )
-
-    ax.add_patch(
-        patches.Circle((center_x, center_y), 0.08, color="white", zorder=5)
-    )
-
-    ax.text(
-        center_x,
-        center_y - 0.6,
-        f"{int(gauge_value)}",
-        ha="center",
-        fontsize=14,
-        fontweight="bold",
-        color="white"
-    )
-
-    ax.text(
-        center_x,
-        center_y - 1.2,
-        "Fear & Greed Index",
-        ha="center",
-        fontsize=8,
-        color="white",
-        alpha=0.7
-    )
-
-    # ========= AXIS SETTINGS =========
     ax.set_xticks(range(len(coins)))
     ax.set_xticklabels(coins, color="white", fontsize=11)
-
-    ax.axhline(0, color="white", alpha=0.3)
-
+    ax.axhline(0, color="white", alpha=0.2)
     ax.set_yticks([])
     ax.set_xlim(-1,2)
     ax.set_ylim(-10,15)
 
-    ax.text(
-        1.9,
-        -9,
-        "ChainMomentum",
-        fontsize=8,
+    # ========= TITLE =========
+    fig.text(
+        0.5, 0.92,
+        "CHAIN MOMENTUM | MARKET INTELLIGENCE",
+        ha="center",
+        fontsize=14,
         color="white",
-        alpha=0.2
+        fontweight="bold"
     )
 
-    plt.subplots_adjust(top=0.88)   # kasih jarak atas
+    # ========= ULTRA CLEAN DIAL =========
+    ax_dial = fig.add_axes([0.68, 0.55, 0.28, 0.35])
+    draw_fear_greed_dial(ax_dial, gauge_value)
+
     filename = "market_chart.png"
     plt.savefig(filename, facecolor="#0b0f1a")
     plt.close()
@@ -376,36 +220,17 @@ def generate_chart(btc_change, eth_change, sol_change):
 
 def scan():
 
-    logging.info("=== CHAIN MOMENTUM SCAN ===")
-
     data = fetch_market_data()
     if not data:
         return
 
-    btc_dominance = fetch_btc_dominance() or 0
-
-    btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
-
-    eth_price = data["ETH"]["quote"]["USD"]["price"]
     eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
-
-    sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
-
-    telegram_message = build_telegram_message(data, btc_dominance)
-    twitter_message = build_twitter_text(
-        btc_price, btc_change,
-        eth_price, eth_change,
-        sol_price, sol_change,
-        btc_dominance
-    )
 
     image_path = generate_chart(btc_change, eth_change, sol_change)
 
-    send_telegram_photo(image_path, telegram_message)
-    post_twitter_with_image(twitter_message, image_path)
-
+    send_telegram_photo(image_path, "🚀 Chain Momentum Update")
     logging.info("SCAN FINISHED")
 
 # ================= ROUTES =================
