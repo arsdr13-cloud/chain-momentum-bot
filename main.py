@@ -242,7 +242,7 @@ Are smart money accumulating here — or distributing?
 
 # ================= BUILD TELEGRAM MESSAGE =================
 
-def build_telegram_message(data, btc_dominance):
+def build_telegram_message(data, btc_dom, eth_dom, sol_dom):
 
     now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
 
@@ -269,7 +269,10 @@ def build_telegram_message(data, btc_dominance):
 💰 SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
 
 ━━━━━━━━━━━━━━━━━━
-📊 BTC Dominance : {btc_dominance:.2f}%
+📊 Market Dominance
+BTC : {btc_dom:.2f}%
+ETH : {eth_dom:.2f}%
+SOL : {sol_dom:.2f}%
 📈 Market Sentiment : {sentiment}
 
 🧠 Insight :
@@ -342,7 +345,12 @@ def scan():
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
-    telegram_message = build_telegram_message(data, btc_dom)
+    telegram_message = build_telegram_message(
+    data,
+    btc_dom,
+    eth_dom,
+    sol_dom
+)
     twitter_message = build_twitter_text(
     btc_price, btc_change,
     eth_price, eth_change,
