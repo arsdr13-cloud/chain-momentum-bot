@@ -280,6 +280,7 @@ def scan():
 
     image_path = "market_chart.png"
     send_telegram_photo(image_path, telegram_message)
+    post_twitter_with_image("CHAIN MOMENTUM UPDATE 🚀", image_path)
 
     logging.info("SCAN FINISHED")
 
