@@ -1,10 +1,11 @@
 import os
 import logging
 import requests
-import matplotlib.pyplot as plt
+import threading
+import time
 from flask import Flask
 import tweepy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # ================= CONFIG =================
 
@@ -23,19 +24,22 @@ COINS = ["BTC", "ETH", "SOL"]
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 
-# ================= INSTITUTIONAL UTC TIMING =================
+# ================= WIB 6H SCHEDULER =================
 
-INSTITUTIONAL_HOURS_UTC = [
-    0,   # Asia Open
-    8,   # London Open
-    13,  # NY Pre-Market
-    14,  # NY Open
-    20   # NY Close
-]
+WIB = timezone(timedelta(hours=7))
+LAST_RUN = None
 
-def is_institutional_time():
-    now = datetime.now(timezone.utc)
-    return now.hour in INSTITUTIONAL_HOURS_UTC
+def is_6h_wib_time():
+    global LAST_RUN
+
+    now = datetime.now(WIB)
+
+    if now.hour % 6 == 0 and now.minute == 0:
+        if LAST_RUN != now.hour:
+            LAST_RUN = now.hour
+            return True
+
+    return False
 
 # ================= TWITTER CLIENT =================
 
@@ -112,155 +116,9 @@ def fetch_market_data():
         logging.error(f"CMC fetch error: {e}")
         return None
 
-# ================= BTC DOMINANCE =================
+# ================= MESSAGE BUILDER =================
 
-def fetch_btc_dominance():
-    try:
-        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
-        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
-        r = requests.get(url, headers=headers, timeout=20)
-
-        if r.status_code != 200:
-            return None
-
-        data = r.json()
-        return data["data"]["btc_dominance"]
-    except:
-        return None
-
-# ================= ETH DOMINANCE =================
-
-def fetch_eth_dominance():
-    try:
-        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
-        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
-
-        r = requests.get(url, headers=headers, timeout=20)
-        if r.status_code != 200:
-            return None
-
-        data = r.json()["data"]
-        total_market_cap = data["quote"]["USD"]["total_market_cap"]
-
-        url2 = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-        params = {"symbol": "ETH"}
-        r2 = requests.get(url2, headers=headers, params=params, timeout=20)
-
-        if r2.status_code != 200:
-            return None
-
-        eth_market_cap = r2.json()["data"]["ETH"]["quote"]["USD"]["market_cap"]
-
-        dominance = (eth_market_cap / total_market_cap) * 100
-        return round(dominance, 2)
-
-    except:
-        return None
-
-# ================= SOL DOMINANCE =================
-
-def fetch_sol_dominance():
-    try:
-        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
-        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
-
-        r = requests.get(url, headers=headers, timeout=20)
-        if r.status_code != 200:
-            return None
-
-        data = r.json()["data"]
-        total_market_cap = data["quote"]["USD"]["total_market_cap"]
-
-        url2 = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-        params = {"symbol": "SOL"}
-        r2 = requests.get(url2, headers=headers, params=params, timeout=20)
-
-        if r2.status_code != 200:
-            return None
-
-        sol_market_cap = r2.json()["data"]["SOL"]["quote"]["USD"]["market_cap"]
-
-        dominance = (sol_market_cap / total_market_cap) * 100
-        return round(dominance, 2)
-
-    except:
-        return None
-
-# ================= SENTIMENT ENGINE =================
-
-def detect_market_sentiment(avg_change):
-    if avg_change < -5:
-        return "🔴 Extreme Fear", "Distribution phase intensifying. Liquidity risk rising."
-    elif avg_change < -2:
-        return "🟠 Risk-Off", "Defensive positioning dominates. Institutions cautious."
-    elif avg_change < 0:
-        return "🟡 Neutral-Bearish", "Mild correction. Monitoring structure."
-    elif avg_change < 3:
-        return "🟢 Neutral-Bullish", "Controlled momentum building."
-    else:
-        return "🚀 Strong Risk-On", "Expansion phase active. Breakout watch."
-
-# ================= BUILD TELEGRAM MESSAGE =================
-
-def build_telegram_message(
-    btc_price, btc_change,
-    eth_price, eth_change,
-    sol_price, sol_change,
-    btc_dom, eth_dom, sol_dom
-):
-
-    avg_change = (btc_change + eth_change + sol_change) / 3
-    sentiment, insight = detect_market_sentiment(avg_change)
-
-    telegram_message = f"""
-🚀 <b>CHAIN MOMENTUM | INSTITUTIONAL REPORT</b>
-━━━━━━━━━━━━━━━━━━
-
-🕒 <i>{datetime.now(timezone.utc).strftime('%d %b %Y | %H:%M UTC')}</i>
-
-💰 <b>BTC</b>  ${btc_price:,.0f}  ({btc_change:.2f}%)
-💰 <b>ETH</b>  ${eth_price:,.0f}  ({eth_change:.2f}%)
-💰 <b>SOL</b>  ${sol_price:,.0f}  ({sol_change:.2f}%)
-
-━━━━━━━━━━━━━━━━━━
-
-📊 <b>Market Dominance</b>
-BTC : {btc_dom:.2f}%
-ETH : {eth_dom:.2f}%
-SOL : {sol_dom:.2f}%
-
-━━━━━━━━━━━━━━━━━━
-
-📈 <b>Market Sentiment</b>
-{sentiment}
-
-🧠 <b>Insight</b>
-{insight}
-
-━━━━━━━━━━━━━━━━━━
-<b>Stay Ahead. Trade Smart.</b>
-"""
-
-    return telegram_message
-
-# ================= SCAN =================
-
-def scan():
-
-    logging.info("=== CHAIN MOMENTUM SCAN ===")
-
-    # 🔥 Institutional UTC Filter
-    if not is_institutional_time():
-        logging.info("Not institutional UTC hour. Scan skipped.")
-        return
-
-    data = fetch_market_data()
-    if not data:
-        return
-
-    btc_dom = fetch_btc_dominance() or 0
-    eth_dom = fetch_eth_dominance() or 0
-    sol_dom = fetch_sol_dominance() or 0
+def build_message(data):
 
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
@@ -271,29 +129,58 @@ def scan():
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
-    telegram_message = build_telegram_message(
-        btc_price, btc_change,
-        eth_price, eth_change,
-        sol_price, sol_change,
-        btc_dom, eth_dom, sol_dom
-    )
+    message = f"""
+🚀 CHAIN MOMENTUM | 6H REPORT
+
+🕒 {datetime.now(WIB).strftime('%d %b %Y | %H:%M WIB')}
+
+BTC  ${btc_price:,.0f}  ({btc_change:.2f}%)
+ETH  ${eth_price:,.0f}  ({eth_change:.2f}%)
+SOL  ${sol_price:,.0f}  ({sol_change:.2f}%)
+
+Stay Ahead. Trade Smart.
+"""
+
+    return message
+
+# ================= SCAN =================
+
+def scan():
+
+    logging.info("=== 6H SCAN CHECK ===")
+
+    if not is_6h_wib_time():
+        return
+
+    logging.info("=== EXECUTING 6H POST ===")
+
+    data = fetch_market_data()
+    if not data:
+        return
+
+    message = build_message(data)
 
     image_path = "market_chart.png"
-    send_telegram_photo(image_path, telegram_message)
-    post_twitter_with_image("CHAIN MOMENTUM UPDATE 🚀", image_path)
 
-    logging.info("SCAN FINISHED")
+    send_telegram_photo(image_path, message)
+    post_twitter_with_image(message, image_path)
+
+    logging.info("=== 6H POST COMPLETE ===")
+
+# ================= AUTO LOOP =================
+
+def scheduler_loop():
+    while True:
+        scan()
+        time.sleep(60)
+
+threading.Thread(target=scheduler_loop, daemon=True).start()
 
 # ================= ROUTES =================
 
 @app.route("/")
 def home():
-    return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
-
-@app.route("/run-scan")
-def run_scan_route():
-    scan()
-    return "✅ SCAN EXECUTED", 200
+    return "🚀 CHAIN MOMENTUM BOT ACTIVE - 6H WIB MODE", 200
 
 # ================= START =================
 
