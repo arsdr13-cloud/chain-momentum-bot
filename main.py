@@ -94,25 +94,9 @@ def fetch_market_data():
         logging.error(f"CMC fetch error: {e}")
         return None
 
-# ================= BTC DOMINANCE =================
+# ================= GLOBAL METRICS =================
 
-def fetch_btc_dominance():
-    try:
-        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
-        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
-        r = requests.get(url, headers=headers, timeout=20)
-
-        if r.status_code != 200:
-            return None
-
-        data = r.json()
-        return data["data"]["btc_dominance"]
-    except:
-        return None
-
-# ================= ETH DOMINANCE =================
-
-def fetch_eth_dominance():
+def fetch_global_metrics():
     try:
         url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
         headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
@@ -121,89 +105,26 @@ def fetch_eth_dominance():
         if r.status_code != 200:
             return None
 
-        data = r.json()["data"]
-
-        total_market_cap = data["quote"]["USD"]["total_market_cap"]
-        eth_market_cap = data["quote"]["USD"]["altcoin_market_cap"] * 0  # placeholder
-
-        # Cara lebih akurat: ambil langsung dari cryptocurrency/quotes
-        url2 = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-        params = {"symbol": "ETH"}
-        r2 = requests.get(url2, headers=headers, params=params, timeout=20)
-
-        if r2.status_code != 200:
-            return None
-
-        eth_market_cap = r2.json()["data"]["ETH"]["quote"]["USD"]["market_cap"]
-
-        dominance = (eth_market_cap / total_market_cap) * 100
-        return round(dominance, 2)
+        return r.json()["data"]
 
     except:
         return None
 
-# ================= SOL DOMINANCE =================
+# ================= ROTATION ENGINE =================
 
-def fetch_sol_dominance():
-    try:
-        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
-        headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
+def detect_rotation(btc_change, eth_change, sol_change, btc_dom):
 
-        r = requests.get(url, headers=headers, timeout=20)
-        if r.status_code != 200:
-            return None
-
-        data = r.json()["data"]
-        total_market_cap = data["quote"]["USD"]["total_market_cap"]
-
-        url2 = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-        params = {"symbol": "SOL"}
-        r2 = requests.get(url2, headers=headers, params=params, timeout=20)
-
-        if r2.status_code != 200:
-            return None
-
-        sol_market_cap = r2.json()["data"]["SOL"]["quote"]["USD"]["market_cap"]
-
-        dominance = (sol_market_cap / total_market_cap) * 100
-        return round(dominance, 2)
-
-    except:
-        return None
-
-# ================= NEWS =================
-
-def fetch_latest_news():
-    try:
-        url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
-        r = requests.get(url, timeout=20)
-
-        if r.status_code != 200:
-            return "No major crypto headlines today."
-
-        data = r.json()
-        for article in data.get("Data", []):
-            title = article.get("title", "")
-            if title:
-                return title
-
-        return "No major crypto headlines today."
-    except:
-        return "No major crypto headlines today."
-
-# ================= SENTIMENT ENGINE =================
-
-def detect_market_sentiment(avg_change):
-    if avg_change < -5:
-        return "🔴 Extreme Fear", "Distribution phase intensifying. Liquidity risk rising."
-    elif avg_change < -2:
-        return "🟠 Risk-Off", "Defensive positioning dominates. Institutions cautious."
-    elif avg_change < 0:
-        return "🟡 Neutral-Bearish", "Mild correction. Monitoring structure."
-    elif avg_change < 3:
-        return "🟢 Neutral-Bullish", "Controlled momentum building."
+    if btc_dom > 58 and btc_change >= eth_change:
+        return "BTC Leadership"
+    elif eth_change > btc_change:
+        return "ETH Relative Strength"
+    elif sol_change > eth_change:
+        return "High Beta Expansion (SOL)"
     else:
-        return "🚀 Strong Risk-On", "Expansion phase active. Breakout watch."
+        return "Balanced Structure"
+
+def calculate_relative_strength(base, compare):
+    return round(compare - base, 2)
 
 # ================= BUILD TWITTER TEXT =================
 
@@ -211,38 +132,38 @@ def build_twitter_text(
     btc_price, btc_change,
     eth_price, eth_change,
     sol_price, sol_change,
-    btc_dominance,
-    eth_dominance,
-    sol_dominance
+    btc_dom
 ):
 
-    avg_change = (btc_change + eth_change + sol_change) / 3
-    sentiment, insight = detect_market_sentiment(avg_change)
+    rotation_signal = detect_rotation(
+        btc_change, eth_change, sol_change, btc_dom
+    )
 
-    tweet_text = f"""🚨 Market Update
+    eth_vs_btc = calculate_relative_strength(btc_change, eth_change)
+    sol_vs_btc = calculate_relative_strength(btc_change, sol_change)
 
-BTC ${btc_price:,.0f} ({btc_change:.2f}%)
-ETH ${eth_price:,.0f} ({eth_change:.2f}%)
-SOL ${sol_price:,.0f} ({sol_change:.2f}%)
+    tweet_text = f"""6H Positioning Brief
 
-Market Dominance
-BTC: {btc_dominance:.2f}%
-ETH: {eth_dominance:.2f}%
-SOL: {sol_dominance:.2f}%
+BTC ${btc_price:,.0f} | {btc_change:.2f}%
+ETH ${eth_price:,.0f} | {eth_change:.2f}%
+SOL ${sol_price:,.0f} | {sol_change:.2f}%
 
-{sentiment}
-{insight}
+BTC.D: {btc_dom:.2f}%
 
-Are smart money accumulating here — or distributing?
+Rotation: {rotation_signal}
 
-#Crypto #BTC #ETH #SOL
+ETH vs BTC: {eth_vs_btc:+.2f}%
+SOL vs BTC: {sol_vs_btc:+.2f}%
+
+Structure controlled.
+Monitoring expansion.
 """
 
     return tweet_text[:280]
 
 # ================= BUILD TELEGRAM MESSAGE =================
 
-def build_telegram_message(data, btc_dom, eth_dom, sol_dom):
+def build_telegram_message(data, global_data):
 
     now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
 
@@ -255,34 +176,31 @@ def build_telegram_message(data, btc_dom, eth_dom, sol_dom):
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
-    avg_change = (btc_change + eth_change + sol_change) / 3
-    sentiment, insight = detect_market_sentiment(avg_change)
+    btc_dom = global_data["btc_dominance"]
 
-    headline = fetch_latest_news()
+    rotation_signal = detect_rotation(
+        btc_change, eth_change, sol_change, btc_dom
+    )
 
-    message = f"""🚀 CHAIN MOMENTUM REPORT
+    message = f"""CHAIN MOMENTUM | POSITIONING REPORT
 ━━━━━━━━━━━━━━━━━━
-🕒 {now}
+Time: {now}
 
-💰 BTC : ${btc_price:,.0f} ({btc_change:.2f}%)
-💰 ETH : ${eth_price:,.0f} ({eth_change:.2f}%)
-💰 SOL : ${sol_price:,.0f} ({sol_change:.2f}%)
+BTC  ${btc_price:,.0f} | {btc_change:.2f}%
+ETH  ${eth_price:,.0f} | {eth_change:.2f}%
+SOL  ${sol_price:,.0f} | {sol_change:.2f}%
 
-━━━━━━━━━━━━━━━━━━
-📊 Market Dominance
-BTC : {btc_dom:.2f}%
-ETH : {eth_dom:.2f}%
-SOL : {sol_dom:.2f}%
-📈 Market Sentiment : {sentiment}
+BTC Dominance: {btc_dom:.2f}%
 
-🧠 Insight :
-{insight}
+Rotation Signal:
+{rotation_signal}
 
-━━━━━━━━━━━━━━━━━━
-📰 Top Headline :
-{headline}
+Relative Strength:
+ETH vs BTC: {eth_change - btc_change:+.2f}%
+SOL vs BTC: {sol_change - btc_change:+.2f}%
 
-Stay Ahead. Trade Smart.
+Positioning monitored.
+Next scan: 6H.
 """
 
     return message
@@ -293,13 +211,9 @@ def generate_chart(btc_change, eth_change, sol_change):
 
     coins = ["BTC", "ETH", "SOL"]
     changes = [btc_change, eth_change, sol_change]
-    colors = ["#00C853" if c >= 0 else "#D50000" for c in changes]
 
-    plt.figure(figsize=(8,5), facecolor="#111111")
-    ax = plt.gca()
-    ax.set_facecolor("#111111")
-
-    bars = plt.bar(coins, changes, color=colors)
+    plt.figure(figsize=(8,5))
+    bars = plt.bar(coins, changes)
 
     for bar in bars:
         height = bar.get_height()
@@ -308,16 +222,15 @@ def generate_chart(btc_change, eth_change, sol_change):
             height,
             f"{height:.2f}%",
             ha="center",
-            va="bottom",
-            color="white"
+            va="bottom"
         )
 
-    plt.axhline(0, color="white", linewidth=1)
-    plt.title("CHAIN MOMENTUM | 24H CHANGE", color="white")
+    plt.axhline(0, linewidth=1)
+    plt.title("6H Relative Change")
 
     plt.tight_layout()
     filename = "market_chart.png"
-    plt.savefig(filename, facecolor="#111111")
+    plt.savefig(filename)
     plt.close()
 
     return filename
@@ -329,12 +242,10 @@ def scan():
     logging.info("=== CHAIN MOMENTUM SCAN ===")
 
     data = fetch_market_data()
-    if not data:
-        return
+    global_data = fetch_global_metrics()
 
-    btc_dom = fetch_btc_dominance() or 0
-    eth_dom = fetch_eth_dominance() or 0
-    sol_dom = fetch_sol_dominance() or 0
+    if not data or not global_data:
+        return
 
     btc_price = data["BTC"]["quote"]["USD"]["price"]
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
@@ -345,20 +256,16 @@ def scan():
     sol_price = data["SOL"]["quote"]["USD"]["price"]
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
-    telegram_message = build_telegram_message(
-    data,
-    btc_dom,
-    eth_dom,
-    sol_dom
-)
+    btc_dom = global_data["btc_dominance"]
+
+    telegram_message = build_telegram_message(data, global_data)
+
     twitter_message = build_twitter_text(
-    btc_price, btc_change,
-    eth_price, eth_change,
-    sol_price, sol_change,
-    btc_dom,
-    eth_dom,
-    sol_dom
-)
+        btc_price, btc_change,
+        eth_price, eth_change,
+        sol_price, sol_change,
+        btc_dom
+    )
 
     image_path = generate_chart(btc_change, eth_change, sol_change)
 
@@ -371,12 +278,12 @@ def scan():
 
 @app.route("/")
 def home():
-    return "🚀 CHAIN MOMENTUM BOT ACTIVE", 200
+    return "CHAIN MOMENTUM BOT ACTIVE", 200
 
 @app.route("/run-scan")
 def run_scan_route():
     scan()
-    return "✅ SCAN EXECUTED", 200
+    return "SCAN EXECUTED", 200
 
 # ================= START =================
 
