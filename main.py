@@ -119,12 +119,28 @@ def detect_rotation(btc_change, eth_change, sol_change, btc_dom):
     elif eth_change > btc_change:
         return "ETH Relative Strength"
     elif sol_change > eth_change:
-        return "High Beta Expansion (SOL)"
+        return "High Beta Expansion"
     else:
         return "Balanced Structure"
 
 def calculate_relative_strength(base, compare):
     return round(compare - base, 2)
+
+# ================= DESK INTERPRETATION LAYER =================
+
+def generate_positioning_bias(rotation_signal, eth_vs_btc, sol_vs_btc):
+
+    if rotation_signal == "BTC Leadership":
+        return "BTC leading. Breadth narrow. Watching continuation."
+
+    elif rotation_signal == "ETH Relative Strength":
+        return "ETH outperforming. Rotation building."
+
+    elif rotation_signal == "High Beta Expansion":
+        return "High beta expansion. Risk appetite improving."
+
+    else:
+        return "Balanced structure. No clear dominance."
 
 # ================= BUILD TWITTER TEXT =================
 
@@ -142,21 +158,27 @@ def build_twitter_text(
     eth_vs_btc = calculate_relative_strength(btc_change, eth_change)
     sol_vs_btc = calculate_relative_strength(btc_change, sol_change)
 
+    bias_line = generate_positioning_bias(
+        rotation_signal,
+        eth_vs_btc,
+        sol_vs_btc
+    )
+
     tweet_text = f"""6H Positioning Brief
 
-BTC ${btc_price:,.0f} | {btc_change:.2f}%
-ETH ${eth_price:,.0f} | {eth_change:.2f}%
-SOL ${sol_price:,.0f} | {sol_change:.2f}%
+BTC {btc_change:+.2f}%
+ETH {eth_change:+.2f}%
+SOL {sol_change:+.2f}%
 
-BTC.D: {btc_dom:.2f}%
+BTC.D {btc_dom:.2f}%
 
 Rotation: {rotation_signal}
 
-ETH vs BTC: {eth_vs_btc:+.2f}%
-SOL vs BTC: {sol_vs_btc:+.2f}%
+Relative Strength:
+ETH/BTC {eth_vs_btc:+.2f}%
+SOL/BTC {sol_vs_btc:+.2f}%
 
-Structure controlled.
-Monitoring expansion.
+{bias_line}
 """
 
     return tweet_text[:280]
@@ -199,13 +221,13 @@ Relative Strength:
 ETH vs BTC: {eth_change - btc_change:+.2f}%
 SOL vs BTC: {sol_change - btc_change:+.2f}%
 
-Positioning monitored.
-Next scan: 6H.
+Desk View:
+Positioning monitored. Awaiting expansion confirmation.
 """
 
     return message
 
-# ================= CHART =================
+# ================= CHART (CLEAN DESK STYLE) =================
 
 def generate_chart(btc_change, eth_change, sol_change):
 
@@ -213,22 +235,12 @@ def generate_chart(btc_change, eth_change, sol_change):
     changes = [btc_change, eth_change, sol_change]
 
     plt.figure(figsize=(8,5))
-    bars = plt.bar(coins, changes)
-
-    for bar in bars:
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width()/2,
-            height,
-            f"{height:.2f}%",
-            ha="center",
-            va="bottom"
-        )
-
+    plt.plot(coins, changes, marker="o")
     plt.axhline(0, linewidth=1)
-    plt.title("6H Relative Change")
 
+    plt.title("6H Relative Performance")
     plt.tight_layout()
+
     filename = "market_chart.png"
     plt.savefig(filename)
     plt.close()
