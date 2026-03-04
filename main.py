@@ -131,16 +131,32 @@ def calculate_relative_strength(base, compare):
 def generate_positioning_bias(rotation_signal, eth_vs_btc, sol_vs_btc):
 
     if rotation_signal == "BTC Leadership":
-        return "BTC leading. Breadth narrow. Watching continuation."
+        return (
+            "BTC leading. Breadth narrow.\n"
+            "Expectation: BTC dominance expands and alts underperform.\n"
+            "Invalid if ETH/BTC or SOL/BTC reclaims strength."
+        )
 
     elif rotation_signal == "ETH Relative Strength":
-        return "ETH outperforming. Rotation building."
+        return (
+            "ETH outperforming. Rotation building.\n"
+            "Expectation: ETH/BTC continues higher with broader participation.\n"
+            "Invalid if BTC dominance expands aggressively."
+        )
 
     elif rotation_signal == "High Beta Expansion":
-        return "High beta expansion. Risk appetite improving."
+        return (
+            "High beta expansion. Risk appetite improving.\n"
+            "Expectation: SOL outperformance continues with volatility expansion.\n"
+            "Invalid if momentum stalls and breadth narrows."
+        )
 
     else:
-        return "Balanced structure. No clear dominance."
+        return (
+            "Balanced structure. No clear dominance.\n"
+            "Expectation: Choppy rotation without strong continuation.\n"
+            "Invalid if one asset establishes clear leadership."
+        )
 
 # ================= BUILD TWITTER TEXT =================
 
