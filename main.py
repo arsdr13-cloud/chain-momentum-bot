@@ -1,7 +1,6 @@
 # =========================================================
 # DESK GRADE v21 — HEDGE FUND FLOW ENGINE
-# BTC • ETH • SOL Liquidity + Positioning Map
-# Stable Version (Bug Fixed)
+# Railway Stable Version
 # =========================================================
 
 import os
@@ -9,6 +8,20 @@ import requests
 import tweepy
 import time
 from datetime import datetime
+from flask import Flask
+import threading
+
+# ================= WEB SERVER (RAILWAY FIX) =================
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Desk Grade v21 running"
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
 
 # ================= CONFIG =================
 
@@ -49,19 +62,15 @@ def safe_request(url, headers=None, params=None):
         return None
 
 
-# ================= PRICE DATA =================
+# ================= PRICE =================
 
 def get_price(symbol):
 
     url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
 
-    headers = {
-        "X-CMC_PRO_API_KEY": CMC_API_KEY
-    }
+    headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
 
-    params = {
-        "symbol": symbol
-    }
+    params = {"symbol": symbol}
 
     data = safe_request(url, headers=headers, params=params)
 
@@ -96,7 +105,7 @@ def get_open_interest(symbol):
         return 0
 
 
-# ================= FUNDING RATE =================
+# ================= FUNDING =================
 
 def get_funding(symbol):
 
@@ -114,7 +123,7 @@ def get_funding(symbol):
         return 0
 
 
-# ================= LIQUIDITY PRESSURE =================
+# ================= PRESSURE =================
 
 def liquidity_pressure(change, funding):
 
@@ -130,8 +139,7 @@ def liquidity_pressure(change, funding):
     elif change < -2 and funding > 0:
         return "Long liquidation"
 
-    else:
-        return "Liquidity compression"
+    return "Liquidity compression"
 
 
 # ================= FLOW SCORE =================
@@ -152,7 +160,7 @@ def flow_score(change, funding):
     return score
 
 
-# ================= TWEET BUILDER =================
+# ================= BUILD TWEET =================
 
 def build_tweet():
 
@@ -169,19 +177,15 @@ def build_tweet():
 
         tweet += (
             f"{symbol}\n"
-            f"P: {round(price,2)}\n"
-            f"24H: {round(change,2)}%\n"
-            f"OI: {round(oi,2)}\n"
-            f"F: {round(funding,4)}\n"
-            f"Score: {score}/3\n"
+            f"P {round(price,2)}\n"
+            f"24H {round(change,2)}%\n"
+            f"OI {round(oi,2)}\n"
+            f"F {round(funding,4)}\n"
+            f"Score {score}/3\n"
             f"{pressure}\n\n"
         )
 
-    tweet += (
-        "Variable now:\n"
-        "watching where liquidity expands next.\n\n"
-        "Structure first. Always."
-    )
+    tweet += "Structure first. Always."
 
     if len(tweet) > 275:
         tweet = tweet[:275]
@@ -189,7 +193,7 @@ def build_tweet():
     return tweet
 
 
-# ================= POST TWEET =================
+# ================= POST =================
 
 def post_tweet():
 
@@ -207,21 +211,23 @@ def post_tweet():
         print("Twitter error:", e)
 
 
-# ================= MAIN LOOP =================
+# ================= BOT LOOP =================
 
 def run_bot():
 
     while True:
 
-        print("Running Hedge Fund Flow Engine:", datetime.now())
+        print("Running:", datetime.now())
 
         post_tweet()
 
-        time.sleep(21600)  # 6H cycle
+        time.sleep(21600)
 
 
 # ================= START =================
 
 if __name__ == "__main__":
 
-    run_bot()
+    threading.Thread(target=run_bot).start()
+
+    run_web()
