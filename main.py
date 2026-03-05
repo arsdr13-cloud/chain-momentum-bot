@@ -26,11 +26,30 @@ ROTATION_THREAD_THRESHOLD = 1.00
 LAST_TWEET_FILE = "last_tweet_id.txt"
 ROTATION_STATE_FILE = "rotation_state.txt"
 
-# ===== NEW DESK GRADE v4 =====
-
 STRUCTURE_FILE = "structure_state.txt"
 LAST_TWEET_TIME = "last_tweet_time.txt"
-TWEET_COOLDOWN = 14400   # 4 hours
+VALIDATION_FILE = "validation_state.txt"
+
+# ===== DESK GRADE v8 ADDITIONS =====
+
+MIN_MOVE_FILTER = 0.30
+SOL_ROTATION_THRESHOLD = 0.80
+ETH_ROTATION_THRESHOLD = 0.50
+
+STRONG_ROTATION_LEVEL = 1.50
+MOMENTUM_CONFIRM_LEVEL = 2.50
+
+VOLATILITY_FILTER = 0.25
+REGIME_ROTATION_LEVEL = 1.20
+REGIME_TREND_LEVEL = 2.80
+
+# ===== DESK GRADE v9 ADDITIONS =====
+
+PRESSURE_IMBALANCE_LEVEL = 2.00
+ALT_EXPANSION_LEVEL = 3.50
+BTC_DEFENSIVE_LEVEL = -2.50
+
+TWEET_COOLDOWN = 14400
 
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
@@ -55,7 +74,7 @@ auth_v1 = tweepy.OAuth1UserHandler(
 
 api_v1 = tweepy.API(auth_v1)
 
-# ================= THREAD STORAGE =================
+# ================= STORAGE =================
 
 def get_last_tweet_id():
     try:
@@ -66,7 +85,6 @@ def get_last_tweet_id():
         pass
     return None
 
-
 def save_last_tweet_id(tweet_id):
     try:
         with open(LAST_TWEET_FILE, "w") as f:
@@ -74,27 +92,26 @@ def save_last_tweet_id(tweet_id):
     except:
         pass
 
-# ================= ROTATION MEMORY =================
+# ================= VALIDATION MEMORY =================
 
-def get_last_rotation_state():
+def save_validation_state(eth_vs_btc, rotation):
     try:
-        if os.path.exists(ROTATION_STATE_FILE):
-            with open(ROTATION_STATE_FILE, "r") as f:
-                return f.read().strip()
-    except:
-        pass
-    return None
-
-
-def save_rotation_state(state):
-    try:
-        with open(ROTATION_STATE_FILE, "w") as f:
-            f.write(state)
+        with open(VALIDATION_FILE, "w") as f:
+            f.write(f"{eth_vs_btc}|{rotation}")
     except:
         pass
 
+def get_validation_state():
+    try:
+        if os.path.exists(VALIDATION_FILE):
+            with open(VALIDATION_FILE, "r") as f:
+                data = f.read().strip().split("|")
+                return float(data[0]), data[1]
+    except:
+        pass
+    return None, None
 
-# ================= STRUCTURE MEMORY (NEW) =================
+# ================= STRUCTURE MEMORY =================
 
 def get_last_structure():
     try:
@@ -105,7 +122,6 @@ def get_last_structure():
         pass
     return None
 
-
 def save_structure(state):
     try:
         with open(STRUCTURE_FILE, "w") as f:
@@ -113,75 +129,30 @@ def save_structure(state):
     except:
         pass
 
-
 # ================= TWEET COOLDOWN =================
 
 def can_tweet():
-
     try:
-
         if os.path.exists(LAST_TWEET_TIME):
-
             with open(LAST_TWEET_TIME, "r") as f:
-
                 last_time = float(f.read().strip())
-
                 now = datetime.utcnow().timestamp()
 
                 if now - last_time < TWEET_COOLDOWN:
-
                     return False
-
     except:
-
         pass
 
     return True
 
-
 def record_tweet():
-
     try:
-
         with open(LAST_TWEET_TIME, "w") as f:
-
             f.write(str(datetime.utcnow().timestamp()))
-
     except:
-
         pass
 
-
-# ================= TELEGRAM =================
-
-def send_telegram_photo(photo_path, caption):
-
-    try:
-
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-
-        with open(photo_path, "rb") as img:
-
-            requests.post(
-
-                url,
-
-                data={"chat_id": CHAT_ID, "caption": caption[:1024]},
-
-                files={"photo": img},
-
-                timeout=20
-
-            )
-
-        logging.info("Telegram sent")
-
-    except Exception as e:
-
-        logging.error(f"Telegram error: {e}")
-
-
-# ================= TWITTER =================
+# ================= TWITTER POST =================
 
 def post_twitter_with_image(message, image_path, thread=False):
 
@@ -194,35 +165,23 @@ def post_twitter_with_image(message, image_path, thread=False):
         if thread and last_tweet_id:
 
             tweet = client.create_tweet(
-
                 text=message,
-
                 media_ids=[media.media_id],
-
                 in_reply_to_tweet_id=last_tweet_id
-
             )
 
         else:
 
             tweet = client.create_tweet(
-
                 text=message,
-
                 media_ids=[media.media_id]
-
             )
 
         save_last_tweet_id(tweet.data["id"])
-
         record_tweet()
 
-        logging.info("Tweet posted successfully")
-
     except Exception as e:
-
-        logging.error(f"Twitter error: {e}")
-
+        logging.error(e)
 
 # ================= MARKET DATA =================
 
@@ -234,26 +193,20 @@ def fetch_market_data():
 
         headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
 
-        params = {"symbol": ",".join(COINS), "convert": "USD"}
+        params = {
+            "symbol": ",".join(COINS),
+            "convert": "USD"
+        }
 
         r = requests.get(url, headers=headers, params=params, timeout=20)
 
         if r.status_code != 200:
-
-            logging.error(f"CMC error: {r.status_code}")
-
             return None
 
         return r.json()["data"]
 
-    except Exception as e:
-
-        logging.error(f"CMC fetch error: {e}")
-
+    except:
         return None
-
-
-# ================= GLOBAL METRICS =================
 
 def fetch_global_metrics():
 
@@ -266,129 +219,183 @@ def fetch_global_metrics():
         r = requests.get(url, headers=headers, timeout=20)
 
         if r.status_code != 200:
-
             return None
 
         return r.json()["data"]
 
     except:
-
         return None
 
+# ================= RELATIVE STRENGTH =================
+
+def calculate_relative_strength(base, compare):
+    return round(compare - base, 2)
+
+# ================= MARKET REGIME ENGINE =================
+
+def detect_market_regime(btc_change, eth_change, sol_change):
+
+    biggest_move = max(abs(btc_change), abs(eth_change), abs(sol_change))
+
+    if biggest_move > REGIME_TREND_LEVEL:
+        return "Trending Market"
+
+    if biggest_move > REGIME_ROTATION_LEVEL:
+        return "Rotation Market"
+
+    return "Range Market"
+
+# ================= MOMENTUM ENGINE =================
+
+def detect_momentum_strength(btc_change, eth_change, sol_change):
+
+    if btc_change > MOMENTUM_CONFIRM_LEVEL:
+        return "BTC Momentum"
+
+    if eth_change > MOMENTUM_CONFIRM_LEVEL:
+        return "ETH Momentum"
+
+    if sol_change > MOMENTUM_CONFIRM_LEVEL:
+        return "SOL Momentum"
+
+    return None
+
+# ================= MARKET PRESSURE ENGINE v9 =================
+
+def detect_market_pressure(btc_change, eth_change, sol_change):
+
+    alt_pressure = (eth_change + sol_change) / 2 - btc_change
+
+    if alt_pressure > ALT_EXPANSION_LEVEL:
+        return "Aggressive Alt Expansion"
+
+    if alt_pressure > PRESSURE_IMBALANCE_LEVEL:
+        return "Alt Pressure Building"
+
+    if btc_change < BTC_DEFENSIVE_LEVEL:
+        return "Defensive BTC Flow"
+
+    return None
 
 # ================= ROTATION ENGINE =================
 
 def detect_rotation(btc_change, eth_change, sol_change, btc_dom):
 
-    if btc_dom > 58 and btc_change >= eth_change:
+    eth_vs_btc = calculate_relative_strength(btc_change, eth_change)
+    sol_vs_btc = calculate_relative_strength(btc_change, sol_change)
 
+    if btc_dom > 58 and btc_change > eth_change:
         return "BTC Leadership"
 
-    elif eth_change > btc_change:
+    if eth_vs_btc > ETH_ROTATION_THRESHOLD:
+
+        if sol_vs_btc > SOL_ROTATION_THRESHOLD:
+            return "Broad Alt Rotation"
 
         return "ETH Relative Strength"
 
-    elif sol_change > eth_change:
-
+    if sol_vs_btc > SOL_ROTATION_THRESHOLD:
         return "High Beta Expansion"
 
-    else:
+    return "Balanced Structure"
 
-        return "Balanced Structure"
+# ================= VALIDATION ENGINE =================
 
+def evaluate_validation(current_eth_vs_btc):
 
-def calculate_relative_strength(base, compare):
+    last_value, last_rotation = get_validation_state()
 
-    return round(compare - base, 2)
+    if last_value is None:
+        return None
 
+    delta = current_eth_vs_btc - last_value
 
-# ================= INTERPRETATION ENGINE =================
+    if abs(delta) < MIN_MOVE_FILTER:
+        return None
 
-def build_interpretation(rotation):
+    if last_rotation == "ETH Relative Strength":
 
-    if rotation == "BTC Leadership":
+        result = "Correct" if delta > 0 else "Wrong"
 
-        return "BTC leading. Breadth still narrow."
+    elif last_rotation == "BTC Leadership":
 
-    elif rotation == "ETH Relative Strength":
-
-        return "ETH starting to outperform BTC."
-
-    elif rotation == "High Beta Expansion":
-
-        return "SOL expanding vs majors."
+        result = "Correct" if delta < 0 else "Wrong"
 
     else:
+        return None
 
-        return "Market rotating without clear leader."
+    return f"""Validation
 
+ETH/BTC move {delta:+.2f}%
+
+Call result: {result}"""
 
 # ================= BUILD TWITTER TEXT =================
 
 def build_twitter_text(
-
     btc_price, btc_change,
-
     eth_price, eth_change,
-
     sol_price, sol_change,
-
     btc_dom
-
 ):
 
-    rotation_signal = detect_rotation(
-
+    regime = detect_market_regime(
         btc_change,
-
         eth_change,
+        sol_change
+    )
 
+    rotation_signal = detect_rotation(
+        btc_change,
+        eth_change,
         sol_change,
-
         btc_dom
+    )
 
+    momentum = detect_momentum_strength(
+        btc_change,
+        eth_change,
+        sol_change
+    )
+
+    pressure = detect_market_pressure(
+        btc_change,
+        eth_change,
+        sol_change
     )
 
     eth_vs_btc = calculate_relative_strength(
-
         btc_change,
-
         eth_change
-
     )
 
     sol_vs_btc = calculate_relative_strength(
-
         btc_change,
-
         sol_change
-
     )
-
-    interpretation = build_interpretation(rotation_signal)
 
     tweet_text = f"""6H Structure Map
 
 BTC {btc_change:+.2f}%
-
 ETH {eth_change:+.2f}%
-
 SOL {sol_change:+.2f}%
 
 BTC.D {btc_dom:.2f}%
+
+Market Regime: {regime}
 
 Rotation: {rotation_signal}
 
 Relative Strength
 
 ETH/BTC {eth_vs_btc:+.2f}%
+SOL/BTC {sol_vs_btc:+.2f}%"""
 
-SOL/BTC {sol_vs_btc:+.2f}%
+    if momentum:
+        tweet_text += f"\nMomentum: {momentum}"
 
-Interpretation:
-
-{interpretation}
-"""
+    if pressure:
+        tweet_text += f"\nFlow: {pressure}"
 
     last_structure = get_last_structure()
 
@@ -396,160 +403,70 @@ Interpretation:
 
     save_structure(rotation_signal)
 
-    return tweet_text[:280], structure_changed
+    save_validation_state(
+        eth_vs_btc,
+        rotation_signal
+    )
 
-
-# ================= TELEGRAM MESSAGE =================
-
-def build_telegram_message(data, global_data):
-
-    now = datetime.utcnow().strftime("%d %b %Y | %H:%M UTC")
-
-    btc_price = data["BTC"]["quote"]["USD"]["price"]
-
-    btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
-
-    eth_price = data["ETH"]["quote"]["USD"]["price"]
-
-    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
-
-    sol_price = data["SOL"]["quote"]["USD"]["price"]
-
-    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
-
-    btc_dom = global_data["btc_dominance"]
-
-    message = f"""CHAIN MOMENTUM | POSITIONING REPORT
-
-━━━━━━━━━━━━━━━━━━
-
-Time: {now}
-
-BTC ${btc_price:,.0f} | {btc_change:.2f}%
-
-ETH ${eth_price:,.0f} | {eth_change:.2f}%
-
-SOL ${sol_price:,.0f} | {sol_change:.2f}%
-
-BTC Dominance: {btc_dom:.2f}
-
-Desk View: Monitoring rotation expansion.
-"""
-
-    return message
-
-
-# ================= CHART =================
-
-def generate_chart(btc_change, eth_change, sol_change):
-
-    coins = ["BTC", "ETH", "SOL"]
-
-    changes = [btc_change, eth_change, sol_change]
-
-    plt.figure(figsize=(8,5))
-
-    plt.plot(coins, changes, marker="o")
-
-    plt.axhline(0, linewidth=1)
-
-    plt.title("6H Relative Performance")
-
-    plt.tight_layout()
-
-    filename = "market_chart.png"
-
-    plt.savefig(filename)
-
-    plt.close()
-
-    return filename
-
+    return tweet_text[:280], structure_changed, eth_vs_btc
 
 # ================= SCAN =================
 
 def scan():
 
-    logging.info("=== CHAIN MOMENTUM SCAN ===")
-
     data = fetch_market_data()
-
     global_data = fetch_global_metrics()
 
     if not data or not global_data:
-
         return
 
     btc_price = data["BTC"]["quote"]["USD"]["price"]
-
     btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
 
     eth_price = data["ETH"]["quote"]["USD"]["price"]
-
     eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
 
     sol_price = data["SOL"]["quote"]["USD"]["price"]
-
     sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
 
     btc_dom = global_data["btc_dominance"]
 
-    telegram_message = build_telegram_message(data, global_data)
-
-    twitter_message, structure_changed = build_twitter_text(
-
+    twitter_message, structure_changed, eth_vs_btc = build_twitter_text(
         btc_price, btc_change,
-
         eth_price, eth_change,
-
         sol_price, sol_change,
-
         btc_dom
-
     )
 
-    image_path = generate_chart(
+    validation = evaluate_validation(eth_vs_btc)
 
-        btc_change,
+    image_path = "market_chart.png"
 
-        eth_change,
+    if validation:
 
-        sol_change
-
-    )
-
-    send_telegram_photo(image_path, telegram_message)
+        post_twitter_with_image(
+            validation,
+            image_path,
+            thread=True
+        )
 
     if structure_changed and can_tweet():
 
         post_twitter_with_image(
-
             twitter_message,
-
             image_path
-
         )
-
-    logging.info("SCAN FINISHED")
-
 
 # ================= ROUTES =================
 
 @app.route("/")
-
 def home():
-
-    return "CHAIN MOMENTUM BOT ACTIVE", 200
-
+    return "CHAIN MOMENTUM BOT v9 ACTIVE", 200
 
 @app.route("/run-scan")
-
 def run_scan_route():
-
     scan()
-
     return "SCAN EXECUTED", 200
-
 
 # ================= START =================
 
@@ -557,4 +474,7 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 8080))
 
-    app.run(host="0.0.0.0", port=port)
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
