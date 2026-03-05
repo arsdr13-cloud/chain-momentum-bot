@@ -1,7 +1,7 @@
 # =========================================================
-# DESK GRADE v20 — LIQUIDITY MAP ENGINE
-# Institutional Flow Desk Bot
-# BTC • ETH • SOL Liquidity + Positioning Map
+# DESK GRADE v21 — HEDGE FUND FLOW ENGINE
+# Institutional Liquidity + Positioning Monitor
+# BTC • ETH • SOL
 # =========================================================
 
 import os
@@ -22,7 +22,15 @@ TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
 
 SYMBOLS = ["BTC", "ETH", "SOL"]
 
-# ================= TWITTER AUTH =================
+CMC_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+
+REQUEST_TIMEOUT = 10
+
+CYCLE_TIME = 21600  # 6 hours
+
+OI_MEMORY = {}
+
+# ================= TWITTER =================
 
 client = tweepy.Client(
     bearer_token=TW_BEARER_TOKEN,
@@ -32,11 +40,24 @@ client = tweepy.Client(
     access_token_secret=TW_ACCESS_SECRET
 )
 
+# ================= SAFE REQUEST =================
+
+def safe_request(url, headers=None, params=None):
+
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+
+        if r.status_code != 200:
+            return None
+
+        return r.json()
+
+    except:
+        return None
+
 # ================= PRICE DATA =================
 
 def get_price(symbol):
-
-    url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
 
     headers = {
         "X-CMC_PRO_API_KEY": CMC_API_KEY
@@ -46,45 +67,61 @@ def get_price(symbol):
         "symbol": symbol
     }
 
-    r = requests.get(url, headers=headers, params=params)
-    data = r.json()
+    data = safe_request(CMC_URL, headers, params)
 
-    price = data["data"][symbol]["quote"]["USD"]["price"]
-    change = data["data"][symbol]["quote"]["USD"]["percent_change_24h"]
+    if not data:
+        return None, None
 
-    return price, change
+    try:
+
+        price = data["data"][symbol]["quote"]["USD"]["price"]
+        change = data["data"][symbol]["quote"]["USD"]["percent_change_24h"]
+
+        return price, change
+
+    except:
+        return None, None
 
 # ================= OPEN INTEREST =================
 
-def get_open_interest(symbol):
+def get_open_interest_shift(symbol):
 
     try:
-        url = f"https://fapi.binance.com/futures/data/openInterestHist?symbol={symbol}USDT&period=5m&limit=2"
-        r = requests.get(url)
-        data = r.json()
 
-        oi_now = float(data[-1]["sumOpenInterest"])
-        oi_prev = float(data[-2]["sumOpenInterest"])
+        url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={symbol}USDT"
+
+        data = safe_request(url)
+
+        if not data:
+            return 0
+
+        oi_now = float(data["openInterest"])
+
+        oi_prev = OI_MEMORY.get(symbol, oi_now)
 
         shift = oi_now - oi_prev
+
+        OI_MEMORY[symbol] = oi_now
 
         return shift
 
     except:
         return 0
 
-# ================= FUNDING RATE =================
+# ================= FUNDING =================
 
 def get_funding(symbol):
 
     try:
+
         url = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}USDT"
-        r = requests.get(url)
-        data = r.json()
 
-        funding = float(data["lastFundingRate"])
+        data = safe_request(url)
 
-        return funding
+        if not data:
+            return 0
+
+        return float(data.get("lastFundingRate", 0))
 
     except:
         return 0
@@ -93,20 +130,22 @@ def get_funding(symbol):
 
 def liquidity_pressure(change, oi_shift):
 
+    if change is None:
+        return "No signal"
+
     if change > 2 and oi_shift > 0:
         return "Long pressure building"
 
-    elif change < -2 and oi_shift > 0:
+    if change < -2 and oi_shift > 0:
         return "Short pressure building"
 
-    elif change > 2 and oi_shift < 0:
+    if change > 2 and oi_shift < 0:
         return "Short squeeze"
 
-    elif change < -2 and oi_shift < 0:
+    if change < -2 and oi_shift < 0:
         return "Long liquidation"
 
-    else:
-        return "Liquidity compression"
+    return "Liquidity compression"
 
 # ================= FLOW SCORE =================
 
@@ -114,7 +153,7 @@ def flow_score(change, oi_shift, funding):
 
     score = 0
 
-    if change > 0:
+    if change and change > 0:
         score += 1
 
     if oi_shift > 0:
@@ -125,7 +164,22 @@ def flow_score(change, oi_shift, funding):
 
     return score
 
-# ================= TWEET BUILDER =================
+# ================= FLOW INTERPRETATION =================
+
+def interpret_flow(score):
+
+    if score == 3:
+        return "Aggressive positioning"
+
+    if score == 2:
+        return "Position building"
+
+    if score == 1:
+        return "Weak flow"
+
+    return "Defensive positioning"
+
+# ================= BUILD TWEET =================
 
 def build_tweet():
 
@@ -134,20 +188,29 @@ def build_tweet():
     for symbol in SYMBOLS:
 
         price, change = get_price(symbol)
-        oi = get_open_interest(symbol)
+
+        oi_shift = get_open_interest_shift(symbol)
+
         funding = get_funding(symbol)
 
-        pressure = liquidity_pressure(change, oi)
-        score = flow_score(change, oi, funding)
+        pressure = liquidity_pressure(change, oi_shift)
+
+        score = flow_score(change, oi_shift, funding)
+
+        interpretation = interpret_flow(score)
+
+        if price is None:
+            continue
 
         tweet += (
             f"{symbol}\n"
             f"Price: {round(price,2)}\n"
             f"24H: {round(change,2)}%\n"
-            f"OI Shift: {round(oi,2)}\n"
+            f"OI Shift: {round(oi_shift,2)}\n"
             f"Funding: {round(funding,4)}\n"
             f"Flow Score: {score}/3\n"
-            f"{pressure}\n\n"
+            f"{pressure}\n"
+            f"{interpretation}\n\n"
         )
 
     tweet += (
@@ -156,7 +219,7 @@ def build_tweet():
         "Structure first. Always."
     )
 
-    return tweet
+    return tweet[:280]
 
 # ================= POST TWEET =================
 
@@ -165,25 +228,29 @@ def post_tweet():
     tweet = build_tweet()
 
     try:
+
         client.create_tweet(text=tweet)
-        print("Tweet posted")
+
+        print("Tweet posted:", datetime.utcnow())
 
     except Exception as e:
+
         print("Twitter error:", e)
 
-# ================= MAIN LOOP =================
+# ================= BOT LOOP =================
 
 def run_bot():
 
     while True:
 
-        print("Running Liquidity Map Engine:", datetime.now())
+        print("Running Flow Engine:", datetime.utcnow())
 
         post_tweet()
 
-        time.sleep(21600)  # 6H cycle
+        time.sleep(CYCLE_TIME)
 
 # ================= START =================
 
 if __name__ == "__main__":
+
     run_bot()
