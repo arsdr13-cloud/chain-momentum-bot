@@ -1,6 +1,6 @@
 # =========================================================
-# DESK GRADE v21 — HEDGE FUND FLOW ENGINE
-# Institutional Liquidity + Positioning Monitor
+# DESK GRADE v21 — HEDGE FUND FLOW ENGINE (STABLE BUILD)
+# Railway Compatible + Crash Fix
 # BTC • ETH • SOL
 # =========================================================
 
@@ -9,6 +9,8 @@ import requests
 import tweepy
 import time
 from datetime import datetime
+from flask import Flask
+import threading
 
 # ================= CONFIG =================
 
@@ -26,9 +28,23 @@ CMC_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
 
 REQUEST_TIMEOUT = 10
 
-CYCLE_TIME = 21600  # 6 hours
+CYCLE_TIME = 21600  # 6H
 
 OI_MEMORY = {}
+
+# ================= FLASK APP (REQUIRED BY RAILWAY) =================
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Desk Grade v21 Flow Engine Running", 200
+
+@app.route("/run-scan")
+def run_scan():
+    post_tweet()
+    return "Scan Executed", 200
+
 
 # ================= TWITTER =================
 
@@ -55,17 +71,12 @@ def safe_request(url, headers=None, params=None):
     except:
         return None
 
-# ================= PRICE DATA =================
+# ================= PRICE =================
 
 def get_price(symbol):
 
-    headers = {
-        "X-CMC_PRO_API_KEY": CMC_API_KEY
-    }
-
-    params = {
-        "symbol": symbol
-    }
+    headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
+    params = {"symbol": symbol}
 
     data = safe_request(CMC_URL, headers, params)
 
@@ -81,6 +92,7 @@ def get_price(symbol):
 
     except:
         return None, None
+
 
 # ================= OPEN INTEREST =================
 
@@ -108,6 +120,7 @@ def get_open_interest_shift(symbol):
     except:
         return 0
 
+
 # ================= FUNDING =================
 
 def get_funding(symbol):
@@ -125,6 +138,7 @@ def get_funding(symbol):
 
     except:
         return 0
+
 
 # ================= LIQUIDITY PRESSURE =================
 
@@ -147,6 +161,7 @@ def liquidity_pressure(change, oi_shift):
 
     return "Liquidity compression"
 
+
 # ================= FLOW SCORE =================
 
 def flow_score(change, oi_shift, funding):
@@ -164,6 +179,7 @@ def flow_score(change, oi_shift, funding):
 
     return score
 
+
 # ================= FLOW INTERPRETATION =================
 
 def interpret_flow(score):
@@ -178,6 +194,7 @@ def interpret_flow(score):
         return "Weak flow"
 
     return "Defensive positioning"
+
 
 # ================= BUILD TWEET =================
 
@@ -204,22 +221,19 @@ def build_tweet():
 
         tweet += (
             f"{symbol}\n"
-            f"Price: {round(price,2)}\n"
+            f"P: {round(price,2)}\n"
             f"24H: {round(change,2)}%\n"
-            f"OI Shift: {round(oi_shift,2)}\n"
-            f"Funding: {round(funding,4)}\n"
-            f"Flow Score: {score}/3\n"
+            f"OI: {round(oi_shift,2)}\n"
+            f"F: {round(funding,4)}\n"
+            f"Score: {score}/3\n"
             f"{pressure}\n"
             f"{interpretation}\n\n"
         )
 
-    tweet += (
-        "Variable now:\n"
-        "watching where liquidity expands next.\n\n"
-        "Structure first. Always."
-    )
+    tweet += "Structure first. Always."
 
     return tweet[:280]
+
 
 # ================= POST TWEET =================
 
@@ -237,9 +251,10 @@ def post_tweet():
 
         print("Twitter error:", e)
 
+
 # ================= BOT LOOP =================
 
-def run_bot():
+def bot_loop():
 
     while True:
 
@@ -249,8 +264,14 @@ def run_bot():
 
         time.sleep(CYCLE_TIME)
 
+
 # ================= START =================
 
 if __name__ == "__main__":
 
-    run_bot()
+    thread = threading.Thread(target=bot_loop)
+    thread.start()
+
+    port = int(os.environ.get("PORT", 8080))
+
+    app.run(host="0.0.0.0", port=port)
