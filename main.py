@@ -6,13 +6,13 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from flask import Flask
 
-# ================= FLASK (RAILWAY KEEP ALIVE) =================
+# ================= FLASK KEEP ALIVE =================
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Desk Grade v21 Running"
+    return "Desk Grade v22 Running"
 
 # ================= CONFIG =================
 
@@ -59,7 +59,7 @@ def get_price(symbol):
 
         price = data["data"][symbol]["quote"]["USD"]["price"]
 
-        return price
+        return float(price)
 
     except Exception as e:
 
@@ -71,9 +71,15 @@ def get_bybit_oi(symbol):
 
     try:
 
-        url = f"https://api.bybit.com/v5/market/open-interest?category=linear&symbol={symbol}USDT&intervalTime=5min"
+        url = "https://api.bybit.com/v5/market/open-interest"
 
-        r = requests.get(url, timeout=10)
+        params = {
+            "category": "linear",
+            "symbol": f"{symbol}USDT",
+            "intervalTime": "5min"
+        }
+
+        r = requests.get(url, params=params, timeout=10)
 
         data = r.json()
 
@@ -107,6 +113,38 @@ def get_okx_funding(symbol):
         return None
 
 
+# ================= FORMAT HELPERS =================
+
+def format_price(price):
+
+    if price is None:
+        return "N/A"
+
+    return f"{price:,.0f}"
+
+
+def format_funding(funding):
+
+    if funding is None:
+        return "N/A"
+
+    return f"{funding*100:.4f}%"
+
+
+def format_oi(oi):
+
+    if oi is None:
+        return "N/A"
+
+    if oi > 1_000_000_000:
+        return f"{oi/1_000_000_000:.2f}B"
+
+    if oi > 1_000_000:
+        return f"{oi/1_000_000:.2f}M"
+
+    return f"{oi:,.0f}"
+
+
 # ================= CHART =================
 
 def generate_chart(prices):
@@ -123,7 +161,7 @@ def generate_chart(prices):
 
         filename = "market_map.png"
 
-        plt.savefig(filename)
+        plt.savefig(filename, bbox_inches="tight")
         plt.close()
 
         return filename
@@ -185,14 +223,14 @@ def run_engine():
         oi = get_bybit_oi(s)
         funding = get_okx_funding(s)
 
-        if price:
+        if price is not None:
             prices[s] = price
 
         report.append(
             f"{s}\n"
-            f"Price: {price}\n"
-            f"OI: {oi}\n"
-            f"Funding: {funding}\n"
+            f"Price: {format_price(price)}\n"
+            f"OI: {format_oi(oi)}\n"
+            f"Funding: {format_funding(funding)}\n"
         )
 
     chart = generate_chart(prices)
@@ -206,13 +244,13 @@ def run_engine():
     post_tweet(tweet_text, chart)
 
 
-# ================= RUN =================
+# ================= START BOT =================
 
 def start_bot():
 
     try:
 
-        logging.info("Desk Grade v21 running")
+        logging.info("Desk Grade v22 running")
 
         run_engine()
 
