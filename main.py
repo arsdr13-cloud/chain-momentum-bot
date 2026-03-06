@@ -4,6 +4,15 @@ import tweepy
 import logging
 from datetime import datetime
 import matplotlib.pyplot as plt
+from flask import Flask
+
+# ================= FLASK (RAILWAY KEEP ALIVE) =================
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Desk Grade v21 Running"
 
 # ================= CONFIG =================
 
@@ -32,6 +41,7 @@ client = tweepy.Client(
 def get_price(symbol):
 
     try:
+
         url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
 
         headers = {
@@ -52,6 +62,7 @@ def get_price(symbol):
         return price
 
     except Exception as e:
+
         logging.error(f"CMC price error {symbol}: {e}")
         return None
 
@@ -59,6 +70,7 @@ def get_price(symbol):
 def get_bybit_oi(symbol):
 
     try:
+
         url = f"https://api.bybit.com/v5/market/open-interest?category=linear&symbol={symbol}USDT&intervalTime=5min"
 
         r = requests.get(url, timeout=10)
@@ -70,6 +82,7 @@ def get_bybit_oi(symbol):
         return oi
 
     except Exception as e:
+
         logging.error(f"Bybit OI error {symbol}: {e}")
         return None
 
@@ -77,6 +90,7 @@ def get_bybit_oi(symbol):
 def get_okx_funding(symbol):
 
     try:
+
         url = f"https://www.okx.com/api/v5/public/funding-rate?instId={symbol}-USDT-SWAP"
 
         r = requests.get(url, timeout=10)
@@ -88,6 +102,7 @@ def get_okx_funding(symbol):
         return funding
 
     except Exception as e:
+
         logging.error(f"OKX funding error {symbol}: {e}")
         return None
 
@@ -193,7 +208,7 @@ def run_engine():
 
 # ================= RUN =================
 
-if __name__ == "__main__":
+def start_bot():
 
     try:
 
@@ -204,3 +219,15 @@ if __name__ == "__main__":
     except Exception as e:
 
         logging.error(f"ENGINE CRASH: {e}")
+
+
+start_bot()
+
+
+# ================= RAILWAY SERVER =================
+
+if __name__ == "__main__":
+
+    port = int(os.environ.get("PORT", 8080))
+
+    app.run(host="0.0.0.0", port=port)
