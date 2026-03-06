@@ -232,15 +232,41 @@ def generate_chart(btc,eth,sol):
     labels=["BTC","ETH","SOL"]
     values=[btc,eth,sol]
 
-    plt.figure()
+    colors=[]
 
-    plt.bar(labels,values)
+    for v in values:
+        if v > 0:
+            colors.append("#2ecc71")   # green
+        elif v < 0:
+            colors.append("#e74c3c")   # red
+        else:
+            colors.append("#95a5a6")   # neutral
 
-    plt.title("6H Market Structure")
+    plt.figure(figsize=(8,5))
+
+    bars = plt.bar(labels,values,color=colors)
+
+    plt.axhline(0,linewidth=1)
+
+    plt.title("6H Liquidity Structure",fontsize=14)
+
+    plt.ylabel("Performance %")
+
+    for bar in bars:
+        y = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width()/2,
+            y,
+            f"{y:+.2f}%",
+            ha='center',
+            va='bottom'
+        )
+
+    plt.tight_layout()
 
     path="market_chart.png"
 
-    plt.savefig(path)
+    plt.savefig(path,dpi=200)
 
     plt.close()
 
@@ -250,12 +276,14 @@ def generate_chart(btc,eth,sol):
 
 def build_tweet(btc,eth,sol,btc_dom):
 
-    eth_vs_btc=relative_strength(btc,eth)
-    sol_vs_btc=relative_strength(btc,sol)
+    eth_vs_btc = relative_strength(btc,eth)
+    sol_vs_btc = relative_strength(btc,sol)
 
-    rotation=detect_rotation(btc,eth,sol)
+    rotation = detect_rotation(btc,eth,sol)
 
-    text=f"""6H Structure Map
+    time = datetime.utcnow().strftime("%H:%M UTC")
+
+    text=f"""6H Structure Map | {time}
 
 BTC {btc:+.2f}%
 ETH {eth:+.2f}%
