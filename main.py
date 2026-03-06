@@ -1,39 +1,21 @@
-# =========================================================
-# DESK GRADE v21 — HEDGE FUND FLOW ENGINE
-# Railway Stable Version
-# =========================================================
-
 import os
 import requests
 import tweepy
-import time
+import logging
 from datetime import datetime
-from flask import Flask
-import threading
-
-# ================= WEB SERVER (RAILWAY FIX) =================
-
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Desk Grade v21 running"
-
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+import matplotlib.pyplot as plt
 
 # ================= CONFIG =================
 
 CMC_API_KEY = os.getenv("CMC_API_KEY")
 
-TW_BEARER_TOKEN = os.getenv("TW_BEARER_TOKEN")
 TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
 TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
+TW_BEARER_TOKEN = os.getenv("TW_BEARER_TOKEN")
 
-SYMBOLS = ["BTC", "ETH", "SOL"]
+logging.basicConfig(level=logging.INFO)
 
 # ================= TWITTER AUTH =================
 
@@ -45,189 +27,180 @@ client = tweepy.Client(
     access_token_secret=TW_ACCESS_SECRET
 )
 
-# ================= SAFE REQUEST =================
-
-def safe_request(url, headers=None, params=None):
-
-    try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-
-        if r.status_code == 200:
-            return r.json()
-
-        return None
-
-    except Exception as e:
-        print("Request error:", e)
-        return None
-
-
-# ================= PRICE =================
+# ================= DATA SOURCES =================
 
 def get_price(symbol):
 
-    url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-
-    headers = {"X-CMC_PRO_API_KEY": CMC_API_KEY}
-
-    params = {"symbol": symbol}
-
-    data = safe_request(url, headers=headers, params=params)
-
-    if not data:
-        return 0, 0
-
     try:
+        url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+
+        headers = {
+            "X-CMC_PRO_API_KEY": CMC_API_KEY
+        }
+
+        params = {
+            "symbol": symbol,
+            "convert": "USD"
+        }
+
+        r = requests.get(url, headers=headers, params=params, timeout=10)
+
+        data = r.json()
+
         price = data["data"][symbol]["quote"]["USD"]["price"]
-        change = data["data"][symbol]["quote"]["USD"]["percent_change_24h"]
 
-        return price, change
+        return price
 
-    except:
-        return 0, 0
+    except Exception as e:
+        logging.error(f"CMC price error {symbol}: {e}")
+        return None
 
 
-# ================= OPEN INTEREST =================
-
-def get_open_interest(symbol):
-
-    url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={symbol}USDT"
-
-    data = safe_request(url)
-
-    if not data:
-        return 0
+def get_bybit_oi(symbol):
 
     try:
-        return float(data["openInterest"])
+        url = f"https://api.bybit.com/v5/market/open-interest?category=linear&symbol={symbol}USDT&intervalTime=5min"
 
-    except:
-        return 0
+        r = requests.get(url, timeout=10)
+
+        data = r.json()
+
+        oi = float(data["result"]["list"][0]["openInterest"])
+
+        return oi
+
+    except Exception as e:
+        logging.error(f"Bybit OI error {symbol}: {e}")
+        return None
 
 
-# ================= FUNDING =================
-
-def get_funding(symbol):
-
-    url = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}USDT"
-
-    data = safe_request(url)
-
-    if not data:
-        return 0
+def get_okx_funding(symbol):
 
     try:
-        return float(data["lastFundingRate"])
+        url = f"https://www.okx.com/api/v5/public/funding-rate?instId={symbol}-USDT-SWAP"
 
-    except:
-        return 0
+        r = requests.get(url, timeout=10)
 
+        data = r.json()
 
-# ================= PRESSURE =================
+        funding = float(data["data"][0]["fundingRate"])
 
-def liquidity_pressure(change, funding):
+        return funding
 
-    if change > 2 and funding > 0:
-        return "Long pressure building"
-
-    elif change < -2 and funding < 0:
-        return "Short pressure building"
-
-    elif change > 2 and funding < 0:
-        return "Short squeeze"
-
-    elif change < -2 and funding > 0:
-        return "Long liquidation"
-
-    return "Liquidity compression"
+    except Exception as e:
+        logging.error(f"OKX funding error {symbol}: {e}")
+        return None
 
 
-# ================= FLOW SCORE =================
+# ================= CHART =================
 
-def flow_score(change, funding):
-
-    score = 0
-
-    if change > 0:
-        score += 1
-
-    if funding > 0:
-        score += 1
-
-    if abs(change) > 2:
-        score += 1
-
-    return score
-
-
-# ================= BUILD TWEET =================
-
-def build_tweet():
-
-    tweet = "6H Liquidity & Positioning Map\n\n"
-
-    for symbol in SYMBOLS:
-
-        price, change = get_price(symbol)
-        oi = get_open_interest(symbol)
-        funding = get_funding(symbol)
-
-        pressure = liquidity_pressure(change, funding)
-        score = flow_score(change, funding)
-
-        tweet += (
-            f"{symbol}\n"
-            f"P {round(price,2)}\n"
-            f"24H {round(change,2)}%\n"
-            f"OI {round(oi,2)}\n"
-            f"F {round(funding,4)}\n"
-            f"Score {score}/3\n"
-            f"{pressure}\n\n"
-        )
-
-    tweet += "Structure first. Always."
-
-    if len(tweet) > 275:
-        tweet = tweet[:275]
-
-    return tweet
-
-
-# ================= POST =================
-
-def post_tweet():
-
-    tweet = build_tweet()
+def generate_chart(prices):
 
     try:
 
-        client.create_tweet(text=tweet)
+        coins = list(prices.keys())
+        values = list(prices.values())
 
-        print("Tweet posted")
-        print(tweet)
+        plt.figure(figsize=(6,4))
+        plt.bar(coins, values)
+
+        plt.title("Desk Grade Liquidity Snapshot")
+
+        filename = "market_map.png"
+
+        plt.savefig(filename)
+        plt.close()
+
+        return filename
 
     except Exception as e:
 
-        print("Twitter error:", e)
+        logging.error(f"Chart error: {e}")
+        return None
 
 
-# ================= BOT LOOP =================
+# ================= TWEET =================
 
-def run_bot():
+def post_tweet(text, image=None):
 
-    while True:
+    try:
 
-        print("Running:", datetime.now())
+        if image:
 
-        post_tweet()
+            auth = tweepy.OAuth1UserHandler(
+                TW_API_KEY,
+                TW_API_SECRET,
+                TW_ACCESS_TOKEN,
+                TW_ACCESS_SECRET
+            )
 
-        time.sleep(21600)
+            api = tweepy.API(auth)
+
+            media = api.media_upload(image)
+
+            client.create_tweet(
+                text=text,
+                media_ids=[media.media_id]
+            )
+
+        else:
+
+            client.create_tweet(text=text)
+
+        logging.info("Tweet posted")
+
+    except Exception as e:
+
+        logging.error(f"Tweet error: {e}")
 
 
-# ================= START =================
+# ================= ENGINE =================
+
+def run_engine():
+
+    symbols = ["BTC", "ETH", "SOL"]
+
+    prices = {}
+
+    report = []
+
+    for s in symbols:
+
+        price = get_price(s)
+        oi = get_bybit_oi(s)
+        funding = get_okx_funding(s)
+
+        if price:
+            prices[s] = price
+
+        report.append(
+            f"{s}\n"
+            f"Price: {price}\n"
+            f"OI: {oi}\n"
+            f"Funding: {funding}\n"
+        )
+
+    chart = generate_chart(prices)
+
+    tweet_text = (
+        "6H Liquidity & Positioning Map\n\n"
+        + "\n".join(report)
+        + "\nStructure first. Always."
+    )
+
+    post_tweet(tweet_text, chart)
+
+
+# ================= RUN =================
 
 if __name__ == "__main__":
 
-    threading.Thread(target=run_bot).start()
+    try:
 
-    run_web()
+        logging.info("Desk Grade v21 running")
+
+        run_engine()
+
+    except Exception as e:
+
+        logging.error(f"ENGINE CRASH: {e}")
