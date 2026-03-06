@@ -24,6 +24,7 @@ STRUCTURE_FILE = "structure_state.txt"
 VALIDATION_FILE = "validation_state.json"
 LAST_TWEET_FILE = "last_tweet_id.txt"
 LAST_TWEET_TIME = "last_tweet_time.txt"
+LAST_TWEET_TEXT = "last_tweet_text.txt"
 
 TWEET_COOLDOWN = 14400
 
@@ -64,6 +65,22 @@ def load_json(file):
         with open(file) as f:
             return json.load(f)
     return {}
+
+def should_tweet(new_text):
+
+    if os.path.exists(LAST_TWEET_TEXT):
+
+        with open(LAST_TWEET_TEXT) as f:
+            last=f.read()
+
+        if last==new_text:
+            logging.info("Duplicate tweet prevented")
+            return False
+
+    with open(LAST_TWEET_TEXT,"w") as f:
+        f.write(new_text)
+
+    return True
 
 # ================= TWEET COOLDOWN =================
 
@@ -302,6 +319,9 @@ SOL/BTC {sol_vs_btc:+.2f}%
 # ================= POST =================
 
 def post_tweet(message,image):
+
+    if not should_tweet(message):
+        return
 
     media=api_v1.media_upload(image)
 
