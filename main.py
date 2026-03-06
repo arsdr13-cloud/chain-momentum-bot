@@ -1,44 +1,54 @@
 import os
-import requests
-import tweepy
 import logging
-from datetime import datetime
+import requests
 import matplotlib.pyplot as plt
 from flask import Flask
-
-# ================= FLASK KEEP ALIVE =================
-
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Desk Grade v22 Running"
+import tweepy
+from datetime import datetime
 
 # ================= CONFIG =================
 
 CMC_API_KEY = os.getenv("CMC_API_KEY")
 
+TW_BEARER_TOKEN = os.getenv("TW_BEARER_TOKEN")
 TW_API_KEY = os.getenv("TW_API_KEY")
 TW_API_SECRET = os.getenv("TW_API_SECRET")
 TW_ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
 TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
-TW_BEARER_TOKEN = os.getenv("TW_BEARER_TOKEN")
+
+COINS = ["BTC","ETH","SOL"]
+
+# ================= LOGGING =================
 
 logging.basicConfig(level=logging.INFO)
 
-# ================= TWITTER AUTH =================
+# ================= FLASK =================
+
+app = Flask(__name__)
+
+# ================= TWITTER CLIENT =================
 
 client = tweepy.Client(
     bearer_token=TW_BEARER_TOKEN,
     consumer_key=TW_API_KEY,
     consumer_secret=TW_API_SECRET,
     access_token=TW_ACCESS_TOKEN,
-    access_token_secret=TW_ACCESS_SECRET
+    access_token_secret=TW_ACCESS_SECRET,
+    wait_on_rate_limit=True
 )
 
-# ================= DATA SOURCES =================
+auth_v1 = tweepy.OAuth1UserHandler(
+    TW_API_KEY,
+    TW_API_SECRET,
+    TW_ACCESS_TOKEN,
+    TW_ACCESS_SECRET
+)
 
-def get_price(symbol):
+api_v1 = tweepy.API(auth_v1)
+
+# ================= MARKET DATA =================
+
+def fetch_market_data():
 
     try:
 
@@ -49,223 +59,295 @@ def get_price(symbol):
         }
 
         params = {
-            "symbol": symbol,
+            "symbol": ",".join(COINS),
             "convert": "USD"
         }
 
-        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r = requests.get(url, headers=headers, params=params)
 
-        data = r.json()
+        if r.status_code != 200:
+            return None
 
-        price = data["data"][symbol]["quote"]["USD"]["price"]
-
-        return float(price)
+        return r.json()["data"]
 
     except Exception as e:
 
-        logging.error(f"CMC price error {symbol}: {e}")
+        logging.error(e)
         return None
 
+# ================= GLOBAL DATA =================
 
-def get_bybit_oi(symbol):
+def fetch_global():
 
     try:
 
-        url = "https://api.bybit.com/v5/market/open-interest"
+        url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
 
-        params = {
-            "category": "linear",
-            "symbol": f"{symbol}USDT",
-            "intervalTime": "5min"
+        headers = {
+            "X-CMC_PRO_API_KEY": CMC_API_KEY
         }
 
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(url, headers=headers)
 
-        data = r.json()
+        if r.status_code != 200:
+            return None
 
-        oi = float(data["result"]["list"][0]["openInterest"])
+        return r.json()["data"]
 
-        return oi
+    except:
 
-    except Exception as e:
-
-        logging.error(f"Bybit OI error {symbol}: {e}")
         return None
 
+# ================= RELATIVE STRENGTH =================
 
-def get_okx_funding(symbol):
+def relative_strength(base, compare):
 
-    try:
+    return round(compare - base,2)
 
-        url = f"https://www.okx.com/api/v5/public/funding-rate?instId={symbol}-USDT-SWAP"
+# ================= STRUCTURE ENGINE =================
 
-        r = requests.get(url, timeout=10)
+def structure_engine(btc_change):
 
-        data = r.json()
+    if btc_change > 3:
 
-        funding = float(data["data"][0]["fundingRate"])
+        return "Bullish Expansion"
 
-        return funding
+    if btc_change < -3:
 
-    except Exception as e:
+        return "Bearish Expansion"
 
-        logging.error(f"OKX funding error {symbol}: {e}")
-        return None
+    return "Range Structure"
 
+# ================= ROTATION ENGINE =================
 
-# ================= FORMAT HELPERS =================
+def rotation_engine(btc,eth,sol):
 
-def format_price(price):
+    eth_vs_btc = relative_strength(btc,eth)
+    sol_vs_btc = relative_strength(btc,sol)
 
-    if price is None:
-        return "N/A"
+    if eth_vs_btc > 0.5 and sol_vs_btc > 1:
 
-    return f"{price:,.0f}"
+        return "Broad Alt Rotation"
 
+    if eth_vs_btc > 0.5:
 
-def format_funding(funding):
+        return "ETH Leadership"
 
-    if funding is None:
-        return "N/A"
+    if sol_vs_btc > 1:
 
-    return f"{funding*100:.4f}%"
+        return "High Beta Expansion"
 
+    return "BTC Dominance"
 
-def format_oi(oi):
+# ================= MOMENTUM ENGINE =================
 
-    if oi is None:
-        return "N/A"
+def momentum_engine(btc,eth,sol):
 
-    if oi > 1_000_000_000:
-        return f"{oi/1_000_000_000:.2f}B"
+    biggest = max(abs(btc),abs(eth),abs(sol))
 
-    if oi > 1_000_000:
-        return f"{oi/1_000_000:.2f}M"
+    if biggest > 4:
 
-    return f"{oi:,.0f}"
+        return "Strong Momentum"
 
+    if biggest > 2:
+
+        return "Momentum Building"
+
+    return "Low Momentum"
+
+# ================= FLOW ENGINE =================
+
+def flow_engine(btc,eth,sol):
+
+    alt_pressure = (eth + sol)/2 - btc
+
+    if alt_pressure > 3:
+
+        return "Aggressive Alt Expansion"
+
+    if alt_pressure > 1.5:
+
+        return "Alt Pressure Building"
+
+    if btc > eth:
+
+        return "BTC Defensive Flow"
+
+    return "Balanced Flow"
+
+# ================= INTENT ENGINE =================
+
+def intent_engine(btc):
+
+    if btc > 4:
+
+        return "Breakout Intent"
+
+    if btc < -4:
+
+        return "Capitulation"
+
+    return "Liquidity Testing"
 
 # ================= CHART =================
 
-def generate_chart(prices):
+def generate_chart(btc,eth,sol):
 
-    try:
+    labels = ["BTC","ETH","SOL"]
+    values = [btc,eth,sol]
 
-        coins = list(prices.keys())
-        values = list(prices.values())
+    plt.figure()
 
-        plt.figure(figsize=(6,4))
-        plt.bar(coins, values)
+    plt.bar(labels,values)
 
-        plt.title("Desk Grade Liquidity Snapshot")
+    plt.title("24H Market Structure")
 
-        filename = "market_map.png"
+    path = "market_chart.png"
 
-        plt.savefig(filename, bbox_inches="tight")
-        plt.close()
+    plt.savefig(path)
 
-        return filename
+    plt.close()
 
-    except Exception as e:
+    return path
 
-        logging.error(f"Chart error: {e}")
-        return None
+# ================= BUILD TEXT =================
 
+def build_text(btc_change,eth_change,sol_change,btc_dom):
 
-# ================= TWEET =================
+    structure = structure_engine(btc_change)
 
-def post_tweet(text, image=None):
-
-    try:
-
-        if image:
-
-            auth = tweepy.OAuth1UserHandler(
-                TW_API_KEY,
-                TW_API_SECRET,
-                TW_ACCESS_TOKEN,
-                TW_ACCESS_SECRET
-            )
-
-            api = tweepy.API(auth)
-
-            media = api.media_upload(image)
-
-            client.create_tweet(
-                text=text,
-                media_ids=[media.media_id]
-            )
-
-        else:
-
-            client.create_tweet(text=text)
-
-        logging.info("Tweet posted")
-
-    except Exception as e:
-
-        logging.error(f"Tweet error: {e}")
-
-
-# ================= ENGINE =================
-
-def run_engine():
-
-    symbols = ["BTC", "ETH", "SOL"]
-
-    prices = {}
-
-    report = []
-
-    for s in symbols:
-
-        price = get_price(s)
-        oi = get_bybit_oi(s)
-        funding = get_okx_funding(s)
-
-        if price is not None:
-            prices[s] = price
-
-        report.append(
-            f"{s}\n"
-            f"Price: {format_price(price)}\n"
-            f"OI: {format_oi(oi)}\n"
-            f"Funding: {format_funding(funding)}\n"
-        )
-
-    chart = generate_chart(prices)
-
-    tweet_text = (
-        "6H Liquidity & Positioning Map\n\n"
-        + "\n".join(report)
-        + "\nStructure first. Always."
+    rotation = rotation_engine(
+        btc_change,
+        eth_change,
+        sol_change
     )
 
-    post_tweet(tweet_text, chart)
+    momentum = momentum_engine(
+        btc_change,
+        eth_change,
+        sol_change
+    )
 
+    flow = flow_engine(
+        btc_change,
+        eth_change,
+        sol_change
+    )
 
-# ================= START BOT =================
+    intent = intent_engine(btc_change)
 
-def start_bot():
+    eth_vs_btc = relative_strength(
+        btc_change,
+        eth_change
+    )
+
+    sol_vs_btc = relative_strength(
+        btc_change,
+        sol_change
+    )
+
+    tweet = f"""
+6H Structure Map
+
+BTC {btc_change:+.2f}%
+ETH {eth_change:+.2f}%
+SOL {sol_change:+.2f}%
+
+BTC.D {btc_dom:.2f}%
+
+Structure: {structure}
+
+Rotation: {rotation}
+
+Momentum: {momentum}
+
+Flow: {flow}
+
+Intent: {intent}
+
+Relative Strength
+
+ETH/BTC {eth_vs_btc:+.2f}%
+SOL/BTC {sol_vs_btc:+.2f}%
+
+Structure first. Always.
+"""
+
+    return tweet[:280]
+
+# ================= TWITTER POST =================
+
+def post_twitter(message,image):
 
     try:
 
-        logging.info("Desk Grade v22 running")
+        media = api_v1.media_upload(image)
 
-        run_engine()
+        client.create_tweet(
+            text=message,
+            media_ids=[media.media_id]
+        )
 
     except Exception as e:
 
-        logging.error(f"ENGINE CRASH: {e}")
+        logging.error(e)
 
+# ================= SCAN =================
 
-start_bot()
+def scan():
 
+    data = fetch_market_data()
+    global_data = fetch_global()
 
-# ================= RAILWAY SERVER =================
+    if not data or not global_data:
+        return
+
+    btc_change = data["BTC"]["quote"]["USD"]["percent_change_24h"]
+    eth_change = data["ETH"]["quote"]["USD"]["percent_change_24h"]
+    sol_change = data["SOL"]["quote"]["USD"]["percent_change_24h"]
+
+    btc_dom = global_data["btc_dominance"]
+
+    tweet = build_text(
+        btc_change,
+        eth_change,
+        sol_change,
+        btc_dom
+    )
+
+    image = generate_chart(
+        btc_change,
+        eth_change,
+        sol_change
+    )
+
+    post_twitter(
+        tweet,
+        image
+    )
+
+# ================= ROUTES =================
+
+@app.route("/")
+def home():
+
+    return "DESK GRADE v14 ACTIVE"
+
+@app.route("/run")
+
+def run():
+
+    scan()
+
+    return "SCAN COMPLETE"
+
+# ================= START =================
 
 if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT",8080))
 
-    app.run(host="0.0.0.0", port=port)
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
