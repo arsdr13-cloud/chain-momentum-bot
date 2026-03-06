@@ -300,7 +300,7 @@ def build_tweet(btc,eth,sol,btc_dom):
 
     time = datetime.utcnow().strftime("%H:%M UTC")
 
-    text=f"""6H Structure Map | {time}
+    text=f"""6H Liquidity & Positioning Map | {time}
 
 BTC {btc:+.2f}%
 ETH {eth:+.2f}%
