@@ -22,6 +22,8 @@ COINS = ["BTC","ETH","SOL"]
 DATA_FILE = "price_memory.json"
 STRUCTURE_FILE = "structure_state.txt"
 VALIDATION_FILE = "validation_state.json"
+CASE_FILE = "cases_history.json"
+
 LAST_TWEET_FILE = "last_tweet_id.txt"
 LAST_TWEET_TIME = "last_tweet_time.txt"
 LAST_TWEET_TEXT = "last_tweet_text.txt"
@@ -74,7 +76,6 @@ def should_tweet(new_text):
             last=f.read()
 
         if last==new_text:
-            logging.info("Duplicate tweet prevented")
             return False
 
     with open(LAST_TWEET_TEXT,"w") as f:
@@ -153,7 +154,6 @@ def update_price_memory(data):
 
     save_json(DATA_FILE,memory)
 
-
 def get_price_6h_ago():
 
     memory=load_json(DATA_FILE)
@@ -183,7 +183,6 @@ def get_price_6h_ago():
 # ================= RELATIVE STRENGTH =================
 
 def relative_strength(base,compare):
-
     return round(compare-base,2)
 
 # ================= ROTATION ENGINE =================
@@ -208,6 +207,34 @@ def detect_rotation(btc,eth,sol):
 
     return "Balanced Structure"
 
+# ================= INTERPRETATION =================
+
+def check_interpretation(rotation):
+
+    last=""
+
+    if os.path.exists(STRUCTURE_FILE):
+
+        with open(STRUCTURE_FILE) as f:
+            last=f.read()
+
+    if rotation!=last:
+
+        with open(STRUCTURE_FILE,"w") as f:
+            f.write(rotation)
+
+        return f"""Interpretation Update
+
+Structure shift detected.
+
+New rotation:
+{rotation}
+
+Watching continuation.
+"""
+
+    return None
+
 # ================= VALIDATION =================
 
 def save_validation(data):
@@ -228,19 +255,63 @@ def evaluate_validation(current):
 
     last_time=state["time"]
 
-    if datetime.utcnow().timestamp()-last_time < 21600:
+    hours_passed=(datetime.utcnow().timestamp()-last_time)/3600
+
+    if hours_passed < 24:
         return None
 
     delta=current-state["eth_vs_btc"]
 
     result="Correct" if delta>0 else "Wrong"
 
-    return f"""Validation
+    return f"""Validation (24h)
 
 ETH/BTC move {delta:+.2f}%
 
 Call result: {result}
 """
+
+# ================= WEEKLY THREAD =================
+
+def save_case(rotation,eth_vs_btc):
+
+    cases=load_json(CASE_FILE)
+
+    now=str(datetime.utcnow().timestamp())
+
+    cases[now]={
+        "rotation":rotation,
+        "eth_vs_btc":eth_vs_btc
+    }
+
+    save_json(CASE_FILE,cases)
+
+def weekly_thread():
+
+    cases=load_json(CASE_FILE)
+
+    if len(cases)<3:
+        return None
+
+    text="Weekly Structure Review\n\n"
+
+    count=0
+
+    for k in list(cases)[-3:]:
+
+        c=cases[k]
+
+        text+=f"""Case {count+1}
+Rotation: {c['rotation']}
+ETH/BTC {c['eth_vs_btc']:+.2f}%
+
+"""
+
+        count+=1
+
+    text+="Repeated structure > noise."
+
+    return text[:280]
 
 # ================= CHART =================
 
@@ -249,42 +320,14 @@ def generate_chart(btc,eth,sol):
     labels=["BTC","ETH","SOL"]
     values=[btc,eth,sol]
 
-    colors=[]
-
-    for v in values:
-        if v > 0:
-            colors.append("#2ecc71")   # green
-        elif v < 0:
-            colors.append("#e74c3c")   # red
-        else:
-            colors.append("#95a5a6")   # neutral
-
     plt.figure(figsize=(8,5))
-
-    bars = plt.bar(labels,values,color=colors)
-
-    plt.axhline(0,linewidth=1)
-
-    plt.title("6H Liquidity Structure",fontsize=14)
-
-    plt.ylabel("Performance %")
-
-    for bar in bars:
-        y = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width()/2,
-            y,
-            f"{y:+.2f}%",
-            ha='center',
-            va='bottom'
-        )
-
-    plt.tight_layout()
+    plt.bar(labels,values)
+    plt.axhline(0)
+    plt.title("6H Liquidity Structure")
 
     path="market_chart.png"
 
     plt.savefig(path,dpi=200)
-
     plt.close()
 
     return path
@@ -318,17 +361,23 @@ SOL/BTC {sol_vs_btc:+.2f}%
 
 # ================= POST =================
 
-def post_tweet(message,image):
+def post_tweet(message,image=None):
 
     if not should_tweet(message):
         return
 
-    media=api_v1.media_upload(image)
+    if image:
 
-    tweet=client.create_tweet(
-        text=message,
-        media_ids=[media.media_id]
-    )
+        media=api_v1.media_upload(image)
+
+        tweet=client.create_tweet(
+            text=message,
+            media_ids=[media.media_id]
+        )
+
+    else:
+
+        tweet=client.create_tweet(text=message)
 
     with open(LAST_TWEET_FILE,"w") as f:
         f.write(str(tweet.data["id"]))
@@ -375,21 +424,33 @@ def scan():
         sol_change
     )
 
+    interpretation=check_interpretation(rotation)
+
+    if interpretation and can_tweet():
+        post_tweet(interpretation)
+
     validation=evaluate_validation(eth_vs_btc)
 
-    if validation:
-        post_tweet(validation,chart)
+    if validation and can_tweet():
+        post_tweet(validation)
 
     if can_tweet():
         post_tweet(tweet,chart)
 
     save_validation(eth_vs_btc)
 
+    save_case(rotation,eth_vs_btc)
+
+    thread=weekly_thread()
+
+    if thread and can_tweet():
+        post_tweet(thread)
+
 # ================= ROUTES =================
 
 @app.route("/")
 def home():
-    return "DESK GRADE v10 ACTIVE",200
+    return "DESK GRADE v11 ACTIVE",200
 
 @app.route("/run-scan")
 def run_scan():
