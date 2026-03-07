@@ -79,6 +79,20 @@ def human_closing():
     ]
     return random.choice(endings)
 
+# ================= MAP FOLLOW ENGINE =================
+
+def map_follow_line():
+
+    lines = [
+        "Following the 6H structure closely.",
+        "Tracking this rotation on the next maps.",
+        "Monitoring how this structure develops.",
+        "Watching if this rotation expands further.",
+        "Tracking liquidity flow into the next cycle."
+    ]
+
+    return random.choice(lines)
+
 # ================= STORAGE =================
 
 def save_json(file,data):
@@ -267,7 +281,7 @@ def build_tweet(btc,eth,sol,btc_dom):
 
     hook = human_hook()
     close = human_closing()
-
+    follow = map_follow_line()
     text=f"""{hook}
 
 6H Liquidity & Positioning Map | {time}
@@ -282,6 +296,8 @@ Rotation: {rotation}
 
 ETH/BTC {eth_vs_btc:+.2f}%
 SOL/BTC {sol_vs_btc:+.2f}%
+
+{follow}
 
 {close}
 """
