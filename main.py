@@ -57,7 +57,6 @@ auth_v1 = tweepy.OAuth1UserHandler(
 api_v1 = tweepy.API(auth_v1)
 
 # ================= HUMAN STYLE ENGINE =================
-# upgrade kecil agar tweet terlihat seperti analis manusia
 
 def human_hook():
 
@@ -95,6 +94,23 @@ def load_json(file):
         with open(file) as f:
             return json.load(f)
     return {}
+
+# ================= STRUCTURE MEMORY =================
+
+def get_last_structure():
+
+    if os.path.exists(STRUCTURE_FILE):
+
+        with open(STRUCTURE_FILE) as f:
+            return f.read().strip()
+
+    return None
+
+
+def save_structure(rotation):
+
+    with open(STRUCTURE_FILE,"w") as f:
+        f.write(rotation)
 
 # ================= THREAD ENGINE =================
 
@@ -352,6 +368,14 @@ def scan():
         btc_dom
     )
 
+    # ================= STRUCTURE FILTER =================
+
+    last_structure = get_last_structure()
+
+    if rotation == last_structure:
+        logging.info("Structure unchanged. Skipping tweet.")
+        return
+
     chart=generate_chart(
         btc_change,
         eth_change,
@@ -359,7 +383,10 @@ def scan():
     )
 
     if can_tweet():
+
         post_tweet(tweet,chart)
+
+        save_structure(rotation)
 
 # ================= ROUTES =================
 
