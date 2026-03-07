@@ -294,6 +294,26 @@ SOL/BTC {sol_vs_btc:+.2f}%
 
     return text[:280],rotation,eth_vs_btc
 
+# ================= GENERATE CHART =================
+
+def generate_chart(btc,eth,sol):
+
+    plt.figure()
+
+    coins = ["BTC","ETH","SOL"]
+    values = [btc,eth,sol]
+
+    plt.bar(coins,values)
+
+    plt.title("6H Relative Performance")
+
+    filename = "chart.png"
+
+    plt.savefig(filename)
+    plt.close()
+
+    return filename
+
 # ================= POST =================
 
 def post_tweet(message,image=None):
