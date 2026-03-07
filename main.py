@@ -292,20 +292,41 @@ SOL/BTC {sol_vs_btc:+.2f}%
 
 def generate_chart(btc,eth,sol):
 
-    plt.figure()
-
     coins = ["BTC","ETH","SOL"]
     values = [btc,eth,sol]
 
-    plt.bar(coins,values)
+    # warna style trading terminal
+    green = "#00C853"
+    red = "#FF1744"
 
-    plt.axhline(0)
+    colors = [green if v >= 0 else red for v in values]
+
+    plt.figure(figsize=(6,4))
+
+    bars = plt.bar(coins,values,color=colors)
+
+    plt.axhline(0,linewidth=1)
+
+    plt.grid(axis="y",linestyle="--",alpha=0.3)
 
     plt.title("6H Relative Performance")
 
-    filename = "chart.png"
+    for bar,value in zip(bars,values):
 
-    plt.savefig(filename)
+        plt.text(
+            bar.get_x()+bar.get_width()/2,
+            value,
+            f"{value:+.2f}%",
+            ha="center",
+            va="bottom" if value>=0 else "top"
+        )
+
+    filename="chart.png"
+
+    plt.tight_layout()
+
+    plt.savefig(filename,dpi=200)
+
     plt.close()
 
     return filename
