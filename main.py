@@ -21,8 +21,9 @@ TW_ACCESS_SECRET = os.getenv("TW_ACCESS_SECRET")
 COINS = ["BTC","ETH","SOL"]
 
 DATA_FILE = "price_memory.json"
+BASELINE_FILE = "baseline.json"
+
 STRUCTURE_FILE = "structure_state.txt"
-VALIDATION_FILE = "validation_state.json"
 
 LAST_TWEET_FILE = "last_tweet_id.txt"
 LAST_TWEET_TIME = "last_tweet_time.txt"
@@ -59,7 +60,6 @@ api_v1 = tweepy.API(auth_v1)
 # ================= HUMAN STYLE ENGINE =================
 
 def human_hook():
-
     hooks = [
         "Market structure update.",
         "Quick liquidity check.",
@@ -67,12 +67,9 @@ def human_hook():
         "Short market snapshot.",
         "Current rotation view."
     ]
-
     return random.choice(hooks)
 
-
 def human_closing():
-
     endings = [
         "Watching for continuation.",
         "Curious if this rotation holds.",
@@ -80,7 +77,6 @@ def human_closing():
         "Liquidity will decide the next move.",
         "Now watching where bids appear."
     ]
-
     return random.choice(endings)
 
 # ================= STORAGE =================
@@ -95,6 +91,29 @@ def load_json(file):
             return json.load(f)
     return {}
 
+# ================= BASELINE SYSTEM =================
+
+def load_baseline():
+
+    if os.path.exists(BASELINE_FILE):
+
+        with open(BASELINE_FILE,"r") as f:
+            return json.load(f)
+
+    return None
+
+
+def save_baseline(btc,eth,sol):
+
+    data={
+        "btc":btc,
+        "eth":eth,
+        "sol":sol
+    }
+
+    with open(BASELINE_FILE,"w") as f:
+        json.dump(data,f)
+
 # ================= STRUCTURE MEMORY =================
 
 def get_last_structure():
@@ -105,7 +124,6 @@ def get_last_structure():
             return f.read().strip()
 
     return None
-
 
 def save_structure(rotation):
 
@@ -208,30 +226,6 @@ def update_price_memory(data):
     }
 
     save_json(DATA_FILE,memory)
-
-def get_price_6h_ago():
-
-    memory=load_json(DATA_FILE)
-
-    if not memory:
-        return None
-
-    now=datetime.utcnow()
-    target=now-timedelta(hours=6)
-
-    closest=None
-    diff=999999999
-
-    for t in memory:
-
-        ts=float(t)
-        d=abs(ts-target.timestamp())
-
-        if d<diff:
-            diff=d
-            closest=memory[t]
-
-    return closest
 
 # ================= RELATIVE STRENGTH =================
 
@@ -366,20 +360,25 @@ def scan():
     if not data or not global_data:
         return
 
-    update_price_memory(data)
-
-    past=get_price_6h_ago()
-
-    if not past:
-        return
-
     btc_now=data["BTC"]["quote"]["USD"]["price"]
     eth_now=data["ETH"]["quote"]["USD"]["price"]
     sol_now=data["SOL"]["quote"]["USD"]["price"]
 
-    btc_change=((btc_now-past["BTC"])/past["BTC"])*100
-    eth_change=((eth_now-past["ETH"])/past["ETH"])*100
-    sol_change=((sol_now-past["SOL"])/past["SOL"])*100
+    # ===== BASELINE CHECK =====
+
+    baseline = load_baseline()
+
+    if baseline is None:
+
+        save_baseline(btc_now,eth_now,sol_now)
+
+        logging.info("Baseline created. Waiting next cycle.")
+
+        return
+
+    btc_change=((btc_now-baseline["btc"])/baseline["btc"])*100
+    eth_change=((eth_now-baseline["eth"])/baseline["eth"])*100
+    sol_change=((sol_now-baseline["sol"])/baseline["sol"])*100
 
     btc_dom=global_data["btc_dominance"]
 
@@ -389,8 +388,6 @@ def scan():
         sol_change,
         btc_dom
     )
-
-    # ================= STRUCTURE FILTER =================
 
     last_structure = get_last_structure()
 
@@ -409,6 +406,8 @@ def scan():
         post_tweet(tweet,chart)
 
         save_structure(rotation)
+
+        save_baseline(btc_now,eth_now,sol_now)
 
 # ================= ROUTES =================
 
