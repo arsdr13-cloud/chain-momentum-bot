@@ -305,6 +305,8 @@ def generate_chart(btc,eth,sol):
 
     plt.bar(coins,values)
 
+    plt.axhline(0)
+
     plt.title("6H Relative Performance")
 
     filename = "chart.png"
