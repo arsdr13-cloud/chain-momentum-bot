@@ -356,36 +356,40 @@ def post_tweet(message,image=None):
 
     reply_to = get_last_tweet_id()
 
-    if image:
+    try:
 
-        media=api_v1.media_upload(image)
+        if image:
+            media = api_v1.media_upload(image)
 
-        if reply_to:
-            tweet=client.create_tweet(
-                text=message,
-                media_ids=[media.media_id],
-                in_reply_to_tweet_id=reply_to
-            )
+            if reply_to:
+                tweet = client.create_tweet(
+                    text=message,
+                    media_ids=[media.media_id],
+                    in_reply_to_tweet_id=reply_to
+                )
+            else:
+                tweet = client.create_tweet(
+                    text=message,
+                    media_ids=[media.media_id]
+                )
+
         else:
-            tweet=client.create_tweet(
-                text=message,
-                media_ids=[media.media_id]
-            )
 
-    else:
+            if reply_to:
+                tweet = client.create_tweet(
+                    text=message,
+                    in_reply_to_tweet_id=reply_to
+                )
+            else:
+                tweet = client.create_tweet(text=message)
 
-        if reply_to:
-            tweet=client.create_tweet(
-                text=message,
-                in_reply_to_tweet_id=reply_to
-            )
-        else:
-            tweet=client.create_tweet(text=message)
+        with open(LAST_TWEET_FILE,"w") as f:
+            f.write(str(tweet.data["id"]))
 
-    with open(LAST_TWEET_FILE,"w") as f:
-        f.write(str(tweet.data["id"]))
+        record_tweet()
 
-    record_tweet()
+    except Exception as e:
+        logging.info(f"Tweet failed: {e}")
 
 # ================= SCAN =================
 
