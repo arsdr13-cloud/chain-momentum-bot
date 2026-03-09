@@ -349,7 +349,7 @@ def generate_chart(btc,eth,sol):
 
 # ================= POST =================
 
-def post_tweet(message,image=None):
+def post_tweet(message, image=None):
 
     if not should_tweet(message):
         return
@@ -360,30 +360,43 @@ def post_tweet(message,image=None):
 
         if image:
             media = api_v1.media_upload(image)
+            media_id = media.media_id_string
 
-            if reply_to:
+            try:
+                if reply_to:
+                    tweet = client.create_tweet(
+                        text=message,
+                        media_ids=[media_id],
+                        in_reply_to_tweet_id=reply_to
+                    )
+                else:
+                    tweet = client.create_tweet(
+                        text=message,
+                        media_ids=[media_id]
+                    )
+
+            except Exception:
+                # fallback jika reply tidak diizinkan
                 tweet = client.create_tweet(
                     text=message,
-                    media_ids=[media.media_id],
-                    in_reply_to_tweet_id=reply_to
-                )
-            else:
-                tweet = client.create_tweet(
-                    text=message,
-                    media_ids=[media.media_id]
+                    media_ids=[media_id]
                 )
 
         else:
 
-            if reply_to:
-                tweet = client.create_tweet(
-                    text=message,
-                    in_reply_to_tweet_id=reply_to
-                )
-            else:
+            try:
+                if reply_to:
+                    tweet = client.create_tweet(
+                        text=message,
+                        in_reply_to_tweet_id=reply_to
+                    )
+                else:
+                    tweet = client.create_tweet(text=message)
+
+            except Exception:
                 tweet = client.create_tweet(text=message)
 
-        with open(LAST_TWEET_FILE,"w") as f:
+        with open(LAST_TWEET_FILE, "w") as f:
             f.write(str(tweet.data["id"]))
 
         record_tweet()
