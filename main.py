@@ -352,57 +352,33 @@ def generate_chart(btc,eth,sol):
 def post_tweet(message, image=None):
 
     if not should_tweet(message):
-        return
+    return
 
-    reply_to = get_last_tweet_id()
+try:
 
-    try:
+    if image:
+        media = api_v1.media_upload(image)
+        media_id = media.media_id_string
 
-        if image:
-            media = api_v1.media_upload(image)
-            media_id = media.media_id_string
+        tweet = client.create_tweet(
+            text=message,
+            media_ids=[media_id]
+        )
 
-            try:
-                if reply_to:
-                    tweet = client.create_tweet(
-                        text=message,
-                        media_ids=[media_id],
-                        in_reply_to_tweet_id=reply_to
-                    )
-                else:
-                    tweet = client.create_tweet(
-                        text=message,
-                        media_ids=[media_id]
-                    )
+    else:
 
-            except Exception:
-                # fallback jika reply tidak diizinkan
-                tweet = client.create_tweet(
-                    text=message,
-                    media_ids=[media_id]
-                )
+        tweet = client.create_tweet(
+            text=message
+        )
 
-        else:
+    # tetap simpan id tweet terakhir (untuk log saja)
+    with open(LAST_TWEET_FILE, "w") as f:
+        f.write(str(tweet.data["id"]))
 
-            try:
-                if reply_to:
-                    tweet = client.create_tweet(
-                        text=message,
-                        in_reply_to_tweet_id=reply_to
-                    )
-                else:
-                    tweet = client.create_tweet(text=message)
+    record_tweet()
 
-            except Exception:
-                tweet = client.create_tweet(text=message)
-
-        with open(LAST_TWEET_FILE, "w") as f:
-            f.write(str(tweet.data["id"]))
-
-        record_tweet()
-
-    except Exception as e:
-        logging.info(f"Tweet failed: {e}")
+except Exception as e:
+    logging.info(f"Tweet failed: {e}")
 
 # ================= SCAN =================
 
