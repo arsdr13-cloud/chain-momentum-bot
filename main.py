@@ -352,33 +352,33 @@ def generate_chart(btc,eth,sol):
 def post_tweet(message, image=None):
 
     if not should_tweet(message):
-    return
+        return
 
-try:
+    try:
 
-    if image:
-        media = api_v1.media_upload(image)
-        media_id = media.media_id_string
+        if image:
 
-        tweet = client.create_tweet(
-            text=message,
-            media_ids=[media_id]
-        )
+            media = api_v1.media_upload(image)
+            media_id = media.media_id_string
 
-    else:
+            tweet = client.create_tweet(
+                text=message,
+                media_ids=[media_id]
+            )
 
-        tweet = client.create_tweet(
-            text=message
-        )
+        else:
 
-    # tetap simpan id tweet terakhir (untuk log saja)
-    with open(LAST_TWEET_FILE, "w") as f:
-        f.write(str(tweet.data["id"]))
+            tweet = client.create_tweet(
+                text=message
+            )
 
-    record_tweet()
+        with open(LAST_TWEET_FILE, "w") as f:
+            f.write(str(tweet.data["id"]))
 
-except Exception as e:
-    logging.info(f"Tweet failed: {e}")
+        record_tweet()
+
+    except Exception as e:
+        logging.info(f"Tweet failed: {e}")
 
 # ================= SCAN =================
 
