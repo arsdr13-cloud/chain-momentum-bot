@@ -79,6 +79,18 @@ def human_closing():
     ]
     return random.choice(endings)
 
+def session_label():
+
+    hour = datetime.utcnow().hour
+
+    if hour < 8:
+        return "Asia session"
+
+    if hour < 16:
+        return "EU session"
+
+    return "US session"
+
 # ================= MAP FOLLOW ENGINE =================
 
 def map_follow_line():
@@ -305,13 +317,19 @@ def build_tweet(btc,eth,sol,btc_dom,btc_price,eth_price,sol_price):
     rotation = detect_rotation(btc,eth,sol)
 
     time = datetime.utcnow().strftime("%H:%M UTC")
-
+    session = session_label()
+   
     hook = human_hook()
     close = human_closing()
     follow = map_follow_line()
+    
+    signal_line = f"{rotation} forming across  majors."
+
     text=f"""{hook}
 
-6H Liquidity & Positioning Map | {time}
+{signal_line}
+
+6H Liquidity & Positioning Map | {session} | {time}
 
 BTC ${btc_price:,.0f}  {btc:+.2f}%
 ETH ${eth_price:,.0f}  {eth:+.2f}%
