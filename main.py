@@ -288,7 +288,7 @@ def build_tweet(btc,eth,sol,btc_dom,btc_price,eth_price,sol_price):
 
 BTC ${btc_price:,.0f}  {btc:+.2f}%
 ETH ${eth_price:,.0f}  {eth:+.2f}%
-SOL ${sol_price:,.2f}  {sol:+.2f}%
+SOL ${sol_price:,.1f}  {sol:+.2f}%
 
 BTC.D {btc_dom:.2f}%
 
