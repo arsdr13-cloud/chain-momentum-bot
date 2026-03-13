@@ -323,13 +323,33 @@ def build_tweet(btc,eth,sol,btc_dom,btc_price,eth_price,sol_price):
     close = human_closing()
     follow = map_follow_line()
     
-    signal_line = f"{rotation} forming across majors."
+    if rotation == "Broad Alt Rotation":
+        signal_line = "Altcoins gaining relative strength across majors."
+        context_line = "Liquidity expanding across higher beta assets."
+
+    elif rotation == "High Beta Expansion":
+        signal_line = "Higher beta assets starting to lead the move."
+        context_line = "Momentum rotating into higher volatility names."
+
+    elif rotation == "ETH Relative Strength":
+        signal_line = "ETH showing relative strength against BTC."
+        context_line = "Capital beginning to concentrate into ETH."
+
+    elif rotation == "BTC Leadership":
+        signal_line = "BTC currently leading the structure."
+        context_line = "Capital rotating back into BTC dominance."
+
+    else:
+        signal_line = "Market structure currently balanced."
+        context_line = "Liquidity currently distributed across majors."
 
     text=f"""{hook}
 
 {signal_line}
+{context_line}
 
-6H Liquidity & Positioning Map | {session} | {time}
+6H Liquidity & Positioning Map
+{session} | {time}
 
 BTC ${btc_price:,.0f}  {btc:+.2f}%
 ETH ${eth_price:,.0f}  {eth:+.2f}%
