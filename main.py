@@ -438,8 +438,8 @@ def scan():
     price_6h = get_price_6h_ago()
 
     if not price_6h:
-    logging.info("Not enough data for 6H      calculation yet.")
-    return
+        logging.info("Not enough data for 6H      calculation yet.")
+        return
 
     btc_change=((btc_now-price_6h["BTC"])/ price_6h["BTC"])*100
     eth_change=((eth_now-price_6h["ETH"])/price_6h["ETH"])*100
