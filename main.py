@@ -323,7 +323,7 @@ def build_tweet(btc,eth,sol,btc_dom,btc_price,eth_price,sol_price):
     close = human_closing()
     follow = map_follow_line()
     
-    signal_line = f"{rotation} forming across  majors."
+    signal_line = f"{rotation} forming across majors."
 
     text=f"""{hook}
 
