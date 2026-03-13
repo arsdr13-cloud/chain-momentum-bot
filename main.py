@@ -437,13 +437,13 @@ def scan():
 
     price_6h = get_price_6h_ago()
 
-if not price_6h:
-    logging.info("Not enough data for 6H calculation yet.")
+    if not price_6h:
+    logging.info("Not enough data for 6H      calculation yet.")
     return
 
-btc_change=((btc_now-price_6h["BTC"])/price_6h["BTC"])*100
-eth_change=((eth_now-price_6h["ETH"])/price_6h["ETH"])*100
-sol_change=((sol_now-price_6h["SOL"])/price_6h["SOL"])*100
+    btc_change=((btc_now-price_6h["BTC"])/ price_6h["BTC"])*100
+    eth_change=((eth_now-price_6h["ETH"])/price_6h["ETH"])*100
+    sol_change=((sol_now-price_6h["SOL"])/price_6h["SOL"])*100
 
     btc_dom=global_data["btc_dominance"]
 
@@ -460,7 +460,7 @@ sol_change=((sol_now-price_6h["SOL"])/price_6h["SOL"])*100
     last_structure = get_last_structure()
 
     if rotation == last_structure:
-        logging.info("Structure unchanged. Skipping tweet.")
+        logging.info("Structure unchanged.  Skipping tweet.")
         return
 
     chart=generate_chart(
