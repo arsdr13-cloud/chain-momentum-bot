@@ -270,7 +270,7 @@ def detect_rotation(btc,eth,sol):
 
 # ================= BUILD TWEET =================
 
-def build_tweet(btc,eth,sol,btc_dom):
+def build_tweet(btc,eth,sol,btc_dom,btc_price,eth_price,sol_price):
 
     eth_vs_btc = relative_strength(btc,eth)
     sol_vs_btc = relative_strength(btc,sol)
@@ -286,9 +286,9 @@ def build_tweet(btc,eth,sol,btc_dom):
 
 6H Liquidity & Positioning Map | {time}
 
-BTC {btc:+.2f}%
-ETH {eth:+.2f}%
-SOL {sol:+.2f}%
+BTC ${btc_price:,.0f}  {btc:+.2f}%
+ETH ${eth_price:,.0f}  {eth:+.2f}%
+SOL ${sol_price:,.2f}  {sol:+.2f}%
 
 BTC.D {btc_dom:.2f}%
 
@@ -413,10 +413,13 @@ def scan():
     btc_dom=global_data["btc_dominance"]
 
     tweet,rotation,eth_vs_btc=build_tweet(
-        btc_change,
-        eth_change,
-        sol_change,
-        btc_dom
+    btc_change,
+    eth_change,
+    sol_change,
+    btc_dom,
+    btc_now,
+    eth_now,
+    sol_now
     )
 
     last_structure = get_last_structure()
