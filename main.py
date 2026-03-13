@@ -241,6 +241,33 @@ def update_price_memory(data):
 
     save_json(DATA_FILE,memory)
 
+# ================= PRICE 6H AGO =================
+
+def get_price_6h_ago():
+
+    memory = load_json(DATA_FILE)
+
+    if not memory:
+        return None
+
+    now = datetime.utcnow().timestamp()
+    target = now - 21600   # 6 jam = 21600 detik
+
+    closest = None
+    closest_time = None
+
+    for t in memory:
+
+        t_float = float(t)
+
+        if t_float <= target:
+
+            if closest_time is None or t_float > closest_time:
+                closest_time = t_float
+                closest = memory[t]
+
+    return closest
+
 # ================= RELATIVE STRENGTH =================
 
 def relative_strength(base,compare):
@@ -394,6 +421,8 @@ def scan():
     eth_now=data["ETH"]["quote"]["USD"]["price"]
     sol_now=data["SOL"]["quote"]["USD"]["price"]
 
+    update_price_memory(data)
+
     # ===== BASELINE CHECK =====
 
     baseline = load_baseline()
@@ -406,9 +435,15 @@ def scan():
 
         return
 
-    btc_change=((btc_now-baseline["btc"])/baseline["btc"])*100
-    eth_change=((eth_now-baseline["eth"])/baseline["eth"])*100
-    sol_change=((sol_now-baseline["sol"])/baseline["sol"])*100
+    price_6h = get_price_6h_ago()
+
+if not price_6h:
+    logging.info("Not enough data for 6H calculation yet.")
+    return
+
+btc_change=((btc_now-price_6h["BTC"])/price_6h["BTC"])*100
+eth_change=((eth_now-price_6h["ETH"])/price_6h["ETH"])*100
+sol_change=((sol_now-price_6h["SOL"])/price_6h["SOL"])*100
 
     btc_dom=global_data["btc_dominance"]
 
