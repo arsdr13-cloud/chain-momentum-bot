@@ -34,6 +34,8 @@ TWEET_COOLDOWN = 14400
 ETH_ROTATION_THRESHOLD = 0.5
 SOL_ROTATION_THRESHOLD = 0.8
 
+MOMENTUM_THRESHOLD = 2.0
+
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
@@ -285,6 +287,22 @@ def get_price_6h_ago():
 def relative_strength(base,compare):
     return round(compare-base,2)
 
+
+# ================= MOMENTUM SHIFT =================
+
+def momentum_shift(btc, eth, sol):
+
+    if abs(btc) > MOMENTUM_THRESHOLD:
+        return True
+
+    if abs(eth) > MOMENTUM_THRESHOLD:
+        return True
+
+    if abs(sol) > MOMENTUM_THRESHOLD:
+        return True
+
+    return False
+
 # ================= ROTATION ENGINE =================
 
 def detect_rotation(btc,eth,sol):
@@ -479,8 +497,8 @@ def scan():
 
     last_structure = get_last_structure()
 
-    if rotation == last_structure:
-        logging.info("Structure unchanged.  Skipping tweet.")
+    if rotation == last_structure and not momentum_shift(btc_change, eth_change, sol_change):
+        logging.info("No rotation change or momentum shift.")
         return
 
     chart=generate_chart(
