@@ -501,15 +501,9 @@ def scan():
         logging.info("No rotation change or momentum shift.")
         return
 
-    chart=generate_chart(
-        btc_change,
-        eth_change,
-        sol_change
-    )
-
     if can_tweet():
 
-        post_tweet(tweet,chart)
+        print(tweet)
 
         save_structure(rotation)
 
@@ -527,6 +521,57 @@ def run_scan():
     scan()
 
     return "SCAN COMPLETE",200
+
+@app.route("/post")
+def manual_post():
+
+    if not can_tweet():
+        return "Tweet cooldown active"
+
+    data = fetch_market_data()
+    global_data = fetch_global()
+
+    if not data or not global_data:
+        return "Data error"
+    update_price_memory(data)
+
+    btc_now=data["BTC"]["quote"]["USD"]["price"]
+    eth_now=data["ETH"]["quote"]["USD"]["price"]
+    sol_now=data["SOL"]["quote"]["USD"]["price"]
+
+    btc_dom=global_data["btc_dominance"]
+
+    price_6h = get_price_6h_ago()
+
+    if not price_6h:
+        return "Not enough data"
+
+    btc_change=((btc_now-price_6h["BTC"])/ price_6h["BTC"])*100
+    eth_change=((eth_now-price_6h["ETH"])/price_6h["ETH"])*100
+    sol_change=((sol_now-price_6h["SOL"])/price_6h["SOL"])*100
+
+    tweet,rotation,_ = build_tweet(
+        btc_change,
+        eth_change,
+        sol_change,
+        btc_dom,
+        btc_now,
+        eth_now,
+        sol_now
+    )
+
+    chart = generate_chart(
+        btc_change,
+        eth_change,
+        sol_change
+    )
+
+    post_tweet(tweet,chart)
+
+    save_structure(rotation)
+    save_baseline(btc_now,eth_now,sol_now)
+
+    return "Tweet posted"
 
 # ================= START =================
 
