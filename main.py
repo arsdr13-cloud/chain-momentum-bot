@@ -83,15 +83,19 @@ def human_closing():
 
 def session_label():
 
-    hour = datetime.utcnow().hour
+    now = datetime.utcnow()
+    hour = now.hour
 
     if hour < 8:
-        return "Asia session"
+        session = "Asia session"
+    elif hour < 16:
+        session = "EU session"
+    else:
+        session = "US session"
 
-    if hour < 16:
-        return "EU session"
+    utc_time = now.strftime("%H:%M UTC")
 
-    return "US session"
+    return f"{session} | {utc_time}"
 
 # ================= MAP FOLLOW ENGINE =================
 
@@ -265,20 +269,19 @@ def get_price_6h_ago():
         return None
 
     now = datetime.utcnow().timestamp()
-    target = now - 21600   # 6 jam = 21600 detik
+    target = now - 21600
 
     closest = None
-    closest_time = None
+    closest_diff = None
 
     for t in memory:
 
         t_float = float(t)
+        diff = abs(t_float - target)
 
-        if t_float <= target:
-
-            if closest_time is None or t_float > closest_time:
-                closest_time = t_float
-                closest = memory[t]
+        if closest_diff is None or diff < closest_diff:
+            closest_diff = diff
+            closest = memory[t]
 
     return closest
 
