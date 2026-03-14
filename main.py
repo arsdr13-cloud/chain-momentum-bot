@@ -311,63 +311,45 @@ def detect_rotation(btc,eth,sol):
 
 def build_tweet(btc,eth,sol,btc_dom,btc_price,eth_price,sol_price):
 
-    eth_vs_btc = relative_strength(btc,eth)
-    sol_vs_btc = relative_strength(btc,sol)
-
     rotation = detect_rotation(btc,eth,sol)
 
-    time = datetime.utcnow().strftime("%H:%M UTC")
     session = session_label()
-   
+
     hook = human_hook()
-    close = human_closing()
-    follow = map_follow_line()
-    
+
     if rotation == "Broad Alt Rotation":
-        signal_line = "Altcoins gaining relative strength across majors."
-        context_line = "Liquidity expanding across higher beta assets."
+        signal = "Altcoins gaining relative strength."
 
     elif rotation == "High Beta Expansion":
-        signal_line = "Higher beta assets starting to lead the move."
-        context_line = "Momentum rotating into higher volatility names."
+        signal = "Higher beta assets starting to lead."
 
     elif rotation == "ETH Relative Strength":
-        signal_line = "ETH showing relative strength against BTC."
-        context_line = "Capital beginning to concentrate into ETH."
+        signal = "ETH showing relative strength."
 
     elif rotation == "BTC Leadership":
-        signal_line = "BTC currently leading the structure."
-        context_line = "Capital rotating back into BTC dominance."
+        signal = "BTC leading market structure."
 
     else:
-        signal_line = "Market structure currently balanced."
-        context_line = "Liquidity currently distributed across majors."
+        signal = "Market structure balanced."
 
     text=f"""{hook}
 
-{signal_line}
-{context_line}
+{signal}
 
-6H Liquidity & Positioning Map
-{session} | {time}
+6H Map | {session}
 
-BTC ${btc_price:,.0f}  {btc:+.2f}%
-ETH ${eth_price:,.0f}  {eth:+.2f}%
-SOL ${sol_price:,.1f}  {sol:+.2f}%
+BTC ${btc_price:,.0f} {btc:+.2f}%
+ETH ${eth_price:,.0f} {eth:+.2f}%
+SOL ${sol_price:,.1f} {sol:+.2f}%
 
 BTC.D {btc_dom:.2f}%
 
 Rotation: {rotation}
-
-ETH/BTC {eth_vs_btc:+.2f}%
-SOL/BTC {sol_vs_btc:+.2f}%
-
-{follow}
-
-{close}
 """
 
-    return text[:280],rotation,eth_vs_btc
+    return text.strip(),rotation,0
+
+    return text.strip(),rotation,eth_vs_btc
 
 # ================= GENERATE CHART =================
 
