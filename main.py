@@ -349,7 +349,7 @@ Rotation: {rotation}
 
     return text.strip(),rotation,0
 
-    return text.strip(),rotation,eth_vs_btc
+    
 
 # ================= GENERATE CHART =================
 
